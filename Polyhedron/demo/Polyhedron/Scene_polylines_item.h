@@ -59,6 +59,7 @@ public Q_SLOTS:
     void change_corner_radii(double);
     void change_corner_radii();
     void split_at_sharp_angles();
+    void decimate();
     void reset_spheres();
 
     void merge(Scene_polylines_item*);

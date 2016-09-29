@@ -7,6 +7,7 @@
 #include <QAction>
 #include <QInputDialog>
 #include <QApplication>
+#include <boost/foreach.hpp>
 
 struct Scene_polylines_item_private {
     typedef Scene_polylines_item::K K;
@@ -383,6 +384,12 @@ QMenu* Scene_polylines_item::contextMenu()
         actionSmoothPolylines->setObjectName("actionSmoothPolylines");
         connect(actionSmoothPolylines, SIGNAL(triggered()),this, SLOT(smooth()));
         menu->setProperty(prop_name, true);
+
+        QAction* actionDecimatePolylines =
+                menu->addAction(tr("Decimate : remove polylines shorter than..."));
+        connect(actionDecimatePolylines, SIGNAL(triggered()),
+                this, SLOT(decimate()));
+        menu->setProperty(prop_name, true);
     }
     return menu;
 }
@@ -532,6 +539,43 @@ void Scene_polylines_item::split_at_sharp_angles()
             }
         }
     }
+  Q_EMIT itemChanged();
+}
+
+void Scene_polylines_item::decimate()
+{
+  typedef Polylines_container Bare_polyline_container;
+  typedef Polyline Bare_polyline;
+  Polylines_container& bare_polylines = polylines;
+
+  bool ok = true;
+  std::size_t min_nb_pts = 3;
+  /*static_cast<std::size_t>(
+    QInputDialog::getInt(mw, tr("Number of vertices"),
+    tr("Discard polylines shorter than : "), 3, 1, 10000, 1, &ok));*/
+  if (!ok)
+    return;
+
+  std::vector<Polylines_container::iterator> too_short;
+  for (Bare_polyline_container::iterator
+        bare_polyline_it = bare_polylines.begin();
+        bare_polyline_it != bare_polylines.end();
+        ++bare_polyline_it)
+  {
+    Bare_polyline_container::iterator current_polyline_it =
+      bare_polyline_it;
+    const Bare_polyline& bare_polyline = *bare_polyline_it;
+    std::size_t nbp = bare_polyline.size();
+    if (bare_polyline.size() < min_nb_pts)
+      too_short.push_back(bare_polyline_it);
+  }
+  
+  BOOST_FOREACH(Bare_polyline_container::iterator poly, too_short)
+    polylines.erase(poly);
+
+  std::cout << "polylines : " << polylines.size() << std::endl;
+
+  invalidateOpenGLBuffers();
   Q_EMIT itemChanged();
 }
 
