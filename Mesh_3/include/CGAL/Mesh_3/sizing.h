@@ -4,9 +4,8 @@
 #include <queue>
 #include <boost/shared_ptr.hpp>
 #include <boost/multi_array.hpp>
+#include <limits>
 
-#define INFINITE_SIZE 1e30
-#define INFINITE_MEASURE 1e30
 
 template <class Kernel>
 class Sizing_grid_node
@@ -27,7 +26,7 @@ public:
   Sizing_grid_node()
   {
     m_done = false;
-    m_size = INFINITE_SIZE;
+    m_size = (std::numeric_limits<double>::max)();
     m_pRef_node = NULL;
     m_indices[0] = m_indices[1] = m_indices[2] = 0;
   }
@@ -211,7 +210,7 @@ public:
 
     const Node *pNode = node(query);
     if (pNode == NULL)
-      return INFINITE_SIZE; // outside bounding box
+      return (std::numeric_limits<double>::max)(); // outside bounding box
     else
       return pNode->size();
   }
