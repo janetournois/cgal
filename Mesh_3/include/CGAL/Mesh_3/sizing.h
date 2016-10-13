@@ -1,8 +1,9 @@
 #ifndef _SIZING_GRID_
 #define _SIZING_GRID_
 
-#include <CGAL/basic.h>
 #include <queue>
+#include <boost/shared_ptr.hpp>
+#include <boost/multi_array.hpp>
 
 #define INFINITE_SIZE 1e30
 #define INFINITE_MEASURE 1e30
@@ -89,7 +90,7 @@ public:
 
 private:
   // grid
-  Node ***m_pppNodes;
+  boost::shared_ptr<boost::multi_array<Node, 3> > m_pppNodes;
   FT m_k;
   FT m_ds;
   FT m_dv;
@@ -149,36 +150,24 @@ private:
 
 public:
   Sizing_grid(const FT& k)
-  {
-    std::cout << "construct sizing grid...";
-    m_k = k;
-    m_ds = m_dv = 0;
-    m_pppNodes = NULL;
-    m_nx = m_ny = m_nz = 0;
-    m_xrange[0] = m_xrange[1] = m_xrange[2] = 0;
-    m_yrange[0] = m_yrange[1] = m_yrange[2] = 0;
-    m_zrange[0] = m_zrange[1] = m_zrange[2] = 0;
-    m_updated = false;
-    std::cout << "done" << std::endl;
-  }
+    : m_pppNodes(new boost::multi_array<Node, 3>(boost::extents[0][0][0]))
+    , m_k(k)
+    , m_ds(0)
+    , m_dv(0)
+    , m_xrange({ 0,0,0 })
+    , m_yrange({ 0,0,0 })
+    , m_zrange({ 0,0,0 })
+    , m_nx(0)
+    , m_ny(0)
+    , m_nz(0)
+    , m_max_size(0)
+    , m_updated(false)
+    , m_constraints()
+  {}
 
   ~Sizing_grid()
   {
-    std::cout << "delete sizing grid...";
-    std::cout.flush();
-    if(m_pppNodes != NULL)//test for "already deleted"
-    {
-      unsigned int i, j;
-      for (i = 0; i < m_nx; i++)
-      {
-        for (j = 0; j < m_ny; j++)
-          delete[] m_pppNodes[i][j];
-        delete[] m_pppNodes[i];
-      }
-      delete[] m_pppNodes;
-      m_pppNodes = NULL;
-    }
-    std::cout << "done" << std::endl;
+    std::cout << "delete sizing grid..."<< std::endl;
   }
 
   FT& k() { return m_k; }
@@ -190,22 +179,10 @@ public:
     return this->value(p);
   }
 
-
   void cleanup()
   {
     m_constraints.clear();
-    if(m_pppNodes != NULL)
-    {
-      unsigned int i, j;
-      for (i = 0; i < m_nx; i++)
-      {
-        for (j = 0; j < m_ny; j++)
-          delete[] m_pppNodes[i][j];
-        delete[] m_pppNodes[i];
-      }
-      delete[] m_pppNodes;
-      m_pppNodes = NULL;
-    }
+    m_pppNodes->resize(boost::extents[0][0][0]);
     m_nx = m_ny = m_nz = 0;
     m_updated = false;
   }
@@ -218,31 +195,8 @@ public:
     cleanup();
 
     // alloc
-    m_pppNodes = new Node**[nx];
-    if (m_pppNodes == NULL)
-    {
-      cleanup();
-      return false;
-    }
-    unsigned int i, j;
-    for (i = 0; i < nx; i++)
-    {
-      m_pppNodes[i] = new Node*[ny];
-      if (m_pppNodes[i] == NULL)
-      {
-        cleanup();
-        return false;
-      }
-      for (j = 0; j < ny; j++)
-      {
-        m_pppNodes[i][j] = new Node[nz];
-        if (m_pppNodes[i][j] == NULL)
-        {
-          cleanup();
-          return false;
-        }
-      }
-    }
+    m_pppNodes->resize(boost::extents[nx][ny][nz]);
+
     m_nx = nx;
     m_ny = ny;
     m_nz = nz;
@@ -362,8 +316,8 @@ public:
   }
 
   Node* node(const int i,
-    const int j,
-    const int k) const
+             const int j,
+             const int k) const
   {
     if (m_pppNodes == NULL)
       return NULL;
@@ -376,7 +330,7 @@ public:
       k >= (int)m_nz)
       return NULL;
 
-    return &m_pppNodes[i][j][k];
+    return &((*m_pppNodes)[i][j][k]);
   }
 
   Node* neighbor(Node* n,
@@ -564,7 +518,7 @@ public:
         FT z = m_zrange[0] + m_ds / 2;
         for (int k = 0; k < (signed)m_nz; k++)
         {
-          Node* pNode = &m_pppNodes[i][j][k];
+          Node* pNode = node(i, j, k);
           pNode->indices(i, j, k);
           pNode->point() = Point(x, y, z);
           z += m_ds;
@@ -589,7 +543,7 @@ public:
     for (unsigned int i = 0; i < m_nx; i++)
     for (unsigned int j = 0; j < m_ny; j++)
     for (unsigned int k = 0; k < m_nz; k++)
-      m_pppNodes[i][j][k].done() = done;
+      node(i, j, k)->done() = done;
   }
 
   // total reset
