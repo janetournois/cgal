@@ -429,31 +429,41 @@ public:
 
       // get node at position p
       Node *pNode = node(p);
-      if (pNode != NULL && pNode->done() == false) // specific
+      if (pNode != NULL && !pNode->done()) // specific
       {
         pNode->point() = p;
         pNode->init_size() = init_size;
         pNode->done() = true;
         pNode->size() = init_size;
         pNode->ref_node(pNode);
-
+      }
+    }
         // look for min size on the boundary
         //FT min_size;
         //Boundary_vertex_handle vertex_min = boundary_vertex_min_size(p,mesh,k,s,min_size);
         //pNode->size() = min_size + c;
         //pNode->ref_node(node(vertex_min->point()));
 
-        // insert all valid neighbors to the priority queue
-        for (unsigned int index_neighbor = 0;
-          index_neighbor < 6;
-          index_neighbor++)
+    for(unsigned int i = 0; i < m_nx; ++i)
+    {
+      for(unsigned int j = 0; j < m_ny; ++j)
+      {
+        for(unsigned int k = 0; k < m_nz; ++k)
         {
-          Node *pNeighbor = neighbor(pNode, index_neighbor);
-          if (pNeighbor != NULL &&
-            pNeighbor->done() == false)
+          Node *pNode = node(i, j, k);
+          if (!pNode->done())
+            continue;
+          // insert all valid neighbors to the priority queue
+          for (unsigned int index_neighbor = 0;
+               index_neighbor < 6;
+               index_neighbor++)
           {
-            Candidate_size candidate(pNeighbor, pNode->ref_node(), m_k);
-            priority_queue.push(candidate);
+            Node *pNeighbor = neighbor(pNode, index_neighbor);
+            if (pNeighbor != NULL && !pNeighbor->done())
+            {
+              Candidate_size candidate(pNeighbor, pNode->ref_node(), m_k);
+              priority_queue.push(candidate);
+            }
           }
         }
       }
