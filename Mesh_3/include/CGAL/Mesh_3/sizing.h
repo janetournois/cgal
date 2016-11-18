@@ -100,6 +100,7 @@ private:
   FT m_max_size;
   bool m_updated;
   std::list<Constraint> m_constraints;
+  FT m_factor;
 
   class Candidate_size
   {
@@ -148,7 +149,7 @@ private:
 
 
 public:
-  Sizing_grid(const FT& k)
+  Sizing_grid(const FT& k, const FT& factor = 1.)
     : m_pppNodes(new boost::multi_array<Node, 3>(boost::extents[0][0][0]))
     , m_k(k)
     , m_ds(0)
@@ -162,6 +163,7 @@ public:
     , m_max_size(0)
     , m_updated(false)
     , m_constraints()
+    , m_factor(factor)
   {}
 
   ~Sizing_grid()
@@ -175,7 +177,7 @@ public:
   template<typename MeshDomainIndex>
   FT operator()(const Point& p, const int, const MeshDomainIndex&) const
   {
-    return this->value(p);
+    return m_factor*this->value(p);
   }
 
   void cleanup()
@@ -436,34 +438,24 @@ public:
         pNode->done() = true;
         pNode->size() = init_size;
         pNode->ref_node(pNode);
-      }
-    }
+
         // look for min size on the boundary
         //FT min_size;
         //Boundary_vertex_handle vertex_min = boundary_vertex_min_size(p,mesh,k,s,min_size);
         //pNode->size() = min_size + c;
         //pNode->ref_node(node(vertex_min->point()));
 
-    for(unsigned int i = 0; i < m_nx; ++i)
-    {
-      for(unsigned int j = 0; j < m_ny; ++j)
-      {
-        for(unsigned int k = 0; k < m_nz; ++k)
+        // insert all valid neighbors to the priority queue
+        for (unsigned int index_neighbor = 0;
+          index_neighbor < 6;
+          index_neighbor++)
         {
-          Node *pNode = node(i, j, k);
-          if (!pNode->done())
-            continue;
-          // insert all valid neighbors to the priority queue
-          for (unsigned int index_neighbor = 0;
-               index_neighbor < 6;
-               index_neighbor++)
+          Node *pNeighbor = neighbor(pNode, index_neighbor);
+          if (pNeighbor != NULL &&
+            pNeighbor->done() == false)
           {
-            Node *pNeighbor = neighbor(pNode, index_neighbor);
-            if (pNeighbor != NULL && !pNeighbor->done())
-            {
-              Candidate_size candidate(pNeighbor, pNode->ref_node(), m_k);
-              priority_queue.push(candidate);
-            }
+            Candidate_size candidate(pNeighbor, pNode->ref_node(), m_k);
+            priority_queue.push(candidate);
           }
         }
       }
