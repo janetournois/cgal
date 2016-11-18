@@ -232,7 +232,8 @@ template <typename Kernel
         , typename Polyhedron
         , typename SizingField>
 void compute_lfs_sizing(const Polyhedron& poly
-                      , SizingField& sizing)
+  , SizingField& sizing
+  , const unsigned int nb_samples = static_cast<unsigned int>(1e6))
 {
   namespace PMP = CGAL::Polygon_mesh_processing;
   typedef boost::graph_traits<Polyhedron>::vertex_descriptor vertex_descriptor;
@@ -243,8 +244,6 @@ void compute_lfs_sizing(const Polyhedron& poly
   lfs.init(poly.points_begin(), poly.points_end());
 
   CGAL::Bbox_3 bbox = PMP::bbox_3(poly);
-
-  unsigned int nb_samples = static_cast<unsigned int>(1e6);
 
   sizing.init(bbox.xmin(), bbox.xmax(),
               bbox.ymin(), bbox.ymax(),
@@ -270,8 +269,9 @@ template <typename Kernel
         , typename PointIterator
         , typename SizingField>
 void compute_lfs_sizing(PointIterator pbegin
-                      , PointIterator pend
-                      , SizingField& sizing)
+  , PointIterator pend
+  , SizingField& sizing
+  , const unsigned int nb_samples = static_cast<unsigned int>(1e6))
 {
   DT3<Kernel> lfs;
 
@@ -279,8 +279,6 @@ void compute_lfs_sizing(PointIterator pbegin
   lfs.init(pbegin, pend);
 
   CGAL::Bbox_3 bbox = CGAL::bbox_3_points(pbegin, pend);
-
-  unsigned int nb_samples = static_cast<unsigned int>(1e6);
 
   sizing.init(bbox.xmin(), bbox.xmax(),
               bbox.ymin(), bbox.ymax(),
