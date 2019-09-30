@@ -905,7 +905,8 @@ private:
                                    + (bbox.ymax()-bbox.ymin())*(bbox.ymax()-bbox.ymin())
                                    + (bbox.zmax()-bbox.zmin())*(bbox.zmax()-bbox.zmin()));
     double log = std::log10(diago_length);
-    unsigned int nb_decimals = (log > 0) ? 5 : (std::ceil(-log)+3);
+    unsigned int nb_decimals = (diago_length > 1) ? std::ceil(log) : std::ceil(-log); //nb needed
+    nb_decimals = nb_decimals + 5; // + 5 to have more space to change value
 
     ui.edgeLength_dspinbox->setDecimals(nb_decimals);
     ui.edgeLength_dspinbox->setSingleStep(1e-3);
