@@ -1277,6 +1277,7 @@ private:
 
   class Facet_updater
   {
+    const Self& m_c3t3_helpers;
     Vertex_set& vertex_to_proj;
     C3T3& c3t3_;
     Update_c3t3& c3t3_updater_;
@@ -1285,8 +1286,10 @@ private:
     typedef Facet& reference;
     typedef const Facet& const_reference;
 
-    Facet_updater(C3T3& c3t3, Vertex_set& vertex_to_proj, Update_c3t3& c3t3_updater_)
-      : vertex_to_proj(vertex_to_proj), c3t3_(c3t3), c3t3_updater_(c3t3_updater_)
+    Facet_updater(const Self& c3t3_helpers,
+      C3T3& c3t3, Vertex_set& vertex_to_proj, Update_c3t3& c3t3_updater_)
+      : m_c3t3_helpers(c3t3_helpers),
+      vertex_to_proj(vertex_to_proj), c3t3_(c3t3), c3t3_updater_(c3t3_updater_)
     {}
 
     void
@@ -1306,9 +1309,9 @@ private:
           const Vertex_handle& v = f.first->vertex((k+i)&3);
           if ( c3t3_.in_dimension(v) > 2 )
           {
-            //lock_vertex_to_proj();
+            m_c3t3_helpers.lock_vertex_to_proj();
             vertex_to_proj.insert(v);
-            //unlock_vertex_to_proj();
+            m_c3t3_helpers.unlock_vertex_to_proj();
           }
         }
       }
@@ -2742,7 +2745,7 @@ rebuild_restricted_delaunay(OutdatedCells& outdated_cells,
     // Note: ~42% of rebuild_restricted_delaunay time
     //  Facet_vector facets;
     lock_vertex_to_proj();
-    Facet_updater facet_updater(c3t3_,vertex_to_proj, updater);
+    Facet_updater facet_updater(*this, c3t3_,vertex_to_proj, updater);
     unlock_vertex_to_proj();
     update_facets(outdated_cells_vector, facet_updater);
 
@@ -2771,7 +2774,7 @@ rebuild_restricted_delaunay(OutdatedCells& outdated_cells,
     // Get facets (returns each canonical facet only once)
     // Note: ~42% of rebuild_restricted_delaunay time
     //  Facet_vector facets;
-    Facet_updater facet_updater(c3t3_,vertex_to_proj, updater);
+    Facet_updater facet_updater(*this, c3t3_,vertex_to_proj, updater);
     update_facets(outdated_cells, facet_updater);
 
     // now we can clear
@@ -2959,7 +2962,7 @@ move_point(const Vertex_handle& old_vertex,
 
   Cell_vector incident_cells_;
   incident_cells_.reserve(64);
-  tr_.incident_cells(old_vertex, std::back_inserter(incident_cells_));
+  tr_.incident_cells_threadsafe(old_vertex, std::back_inserter(incident_cells_));
 
   const Weighted_point& position = tr_.point(old_vertex);
   const Weighted_point& new_position = cwp(translate(cp(position), move));
@@ -3885,7 +3888,7 @@ get_conflict_zone_topo_change(const Vertex_handle& v,
   // Get triangulation_vertex incident cells : removal conflict zone
   // TODO: hasn't it already been computed in "perturb_vertex" (when getting the slivers)?
   // We don't try to lock the incident cells since they've already been locked
-  tr_.incident_cells(v, removal_conflict_cells);
+  tr_.incident_cells_threadsafe(v, removal_conflict_cells);
 
   // Get conflict_point conflict zone
   int li=0;
