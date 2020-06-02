@@ -4083,13 +4083,13 @@ make_canonical(Vertex_triple& t) const
   Vertex_handle tmp;
   switch(i)
   {
-    case 0: return;
+    case 0: break;
     case 1:
       tmp = t.first;
       t.first = t.second;
       t.second = t.third;
       t.third = tmp;
-      return;
+      break;
     default:
       tmp = t.first;
       t.first = t.third;
@@ -4097,7 +4097,15 @@ make_canonical(Vertex_triple& t) const
       t.second = tmp;
   }
 
-  CGAL_assertion(t.first < t.second && t.second < t.third);
+  if (!(t.first < t.second && t.second < t.third))
+  {
+    std::cout << "check order" << std::endl;
+    if(t.first < t.second && t.first < t.third)
+      std::cout << "first is first" << std::endl;
+    else
+      std::cout << "??????" << std::endl;
+  }
+//  CGAL_assertion(t.first < t.second && t.second < t.third);
 }
 
 template < class GT, class Tds, class Lds >
@@ -4625,8 +4633,8 @@ make_hole_3D(Vertex_handle v,
   {
     int indv = (*cit)->index(v);
     Cell_handle opp_cit = (*cit)->neighbor(indv);
-    if(perturb_started && !is_cell_locked_by_this_thread(opp_cit))
-      std::cerr << "neighbor not locked" << std::endl;
+//    if(perturb_started && !is_cell_locked_by_this_thread(opp_cit))
+//      std::cerr << "neighbor not locked" << std::endl;
 ////    CGAL_assertion(is_cell_locked_by_this_thread(opp_cit));
     Facet f(opp_cit, opp_cit->index(*cit));
     Vertex_triple vt = make_vertex_triple(f);
