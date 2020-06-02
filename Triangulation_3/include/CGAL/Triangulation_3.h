@@ -4096,6 +4096,8 @@ make_canonical(Vertex_triple& t) const
       t.third = t.second;
       t.second = tmp;
   }
+
+  CGAL_assertion(t.first < t.second && t.second < t.third);
 }
 
 template < class GT, class Tds, class Lds >
@@ -4863,17 +4865,20 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
         Vertex_triple vt(vmap[vt_aux.first], vmap[vt_aux.third], vmap[vt_aux.second]);
         make_canonical(vt);
 
-        if (!is_point_locked_by_this_thread(vt.first->point()))
+        if (vt.first != infinite_vertex()
+          && !is_point_locked_by_this_thread(vt.first->point()))
         {
           std::cout << std::endl << "not locked" << std::endl;
           CGAL_assertion(false);
         }
-        if (!is_point_locked_by_this_thread(vt.second->point()))
+        if (vt.second != infinite_vertex()
+          && !is_point_locked_by_this_thread(vt.second->point()))
         {
           std::cout << std::endl << "not locked" << std::endl;
           CGAL_assertion(false);
         }
-        if (!is_point_locked_by_this_thread(vt.third->point()))
+        if (vt.third != infinite_vertex()
+          && !is_point_locked_by_this_thread(vt.third->point()))
         {
           std::cout << std::endl << "not locked" << std::endl;
           CGAL_assertion(false);
@@ -4895,17 +4900,20 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
         Vertex_triple vt(vmap[vt_aux.first], vmap[vt_aux.third], vmap[vt_aux.second]);
         make_canonical(vt);
 
-        if (!is_point_locked_by_this_thread(vt.first->point()))
+        if (vt.first != infinite_vertex()
+          && !is_point_locked_by_this_thread(vt.first->point()))
         {
           std::cout << std::endl << "not locked" << std::endl;
           CGAL_assertion(false);
         }
-        if (!is_point_locked_by_this_thread(vt.second->point()))
+        if (vt.second != infinite_vertex()
+          && !is_point_locked_by_this_thread(vt.second->point()))
         {
           std::cout << std::endl << "not locked" << std::endl;
           CGAL_assertion(false);
         }
-        if (!is_point_locked_by_this_thread(vt.third->point()))
+        if (vt.third != infinite_vertex()
+          && !is_point_locked_by_this_thread(vt.third->point()))
         {
           std::cout << std::endl << "not locked" << std::endl;
           CGAL_assertion(false);
@@ -4976,7 +4984,7 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
           << &*(vtauxcheck.first) << " " << &*(vtauxcheck.second) << " " << &*(vtauxcheck.third) << "\n";
       std::cerr << maps.str() << std::endl;
 
-      CGAL_assertion(vtaux != vtauxcheck);
+      CGAL_assertion(vtaux == vtauxcheck);
     }
     // canonical order has not changed
 
@@ -5031,9 +5039,11 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
         if(oit2 == outer_map.end())
         {
           std::swap(vt.second,vt.third);
-//          if(outer_map.find(vt) != outer_map.end())
-//            maps << "outer_map contains vt!" << std::endl; 
-//          maps << "swap " << &*(vt.second) << " and " << &*(vt.third) << "\n";
+          if (outer_map.find(vt) != outer_map.end())
+          {
+            maps << "outer_map contains vt!" << std::endl;
+            maps << "swap " << &*(vt.second) << " and " << &*(vt.third) << "\n";
+          }
 //          maps << "\tfirst = " << &*(vt.first) << std::endl;
 //          if (outer_map.find(vt) == outer_map.end())
             outer_map[vt]= f;
