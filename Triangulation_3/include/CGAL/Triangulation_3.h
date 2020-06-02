@@ -4614,12 +4614,18 @@ make_hole_3D(Vertex_handle v,
 
   incident_cells(v, std::back_inserter(hole));
 
+  for(Cell_handle c : hole)
+    CGAL_assertion(is_cell_locked_by_this_thread(c));
+
   for(typename std::vector<Cell_handle>::iterator cit = hole.begin(),
                                                   end = hole.end();
       cit != end; ++cit)
   {
     int indv = (*cit)->index(v);
     Cell_handle opp_cit = (*cit)->neighbor(indv);
+    if(perturb_started && !is_cell_locked_by_this_thread(opp_cit))
+      std::cerr << "neighbor not locked" << std::endl;
+////    CGAL_assertion(is_cell_locked_by_this_thread(opp_cit));
     Facet f(opp_cit, opp_cit->index(*cit));
     Vertex_triple vt = make_vertex_triple(f);
     make_canonical(vt);
@@ -4753,6 +4759,14 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
   vertices.reserve(64);
   adjacent_vertices(v, std::back_inserter(vertices));
 
+  for (Vertex_handle vv : vertices)
+  {
+    if (!is_point_locked_by_this_thread(vv->point()))
+    {
+      std::cout << std::endl << "not locked" << std::endl;
+      CGAL_assertion(false);
+    }
+  }
   // create a Delaunay triangulation of the points on the boundary
   // and make a map from the vertices in remover.tmp towards the vertices
   // in *this
@@ -4827,6 +4841,16 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
   // We reorient the vertex triple so that it matches those from outer_map
   // Also note that we use the vertices of *this, not of remover.tmp
 
+  std::ostringstream maps("");
+  maps << "remove v = " << &*v << 
+    " with thread " << std::this_thread::get_id() << "\n"
+    "outer_map contains :\n";
+  for (auto omp : outer_map)
+  {
+    Vertex_triple vt = omp.first;
+    maps << &*(vt.first) << " " << &*(vt.second) << " " << &*(vt.third) << "\n";
+  }
+
   if(inf)
   {
     for(All_cells_iterator it = remover.tmp.all_cells_begin(),
@@ -4838,6 +4862,23 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
         Vertex_triple vt_aux = make_vertex_triple(f);
         Vertex_triple vt(vmap[vt_aux.first], vmap[vt_aux.third], vmap[vt_aux.second]);
         make_canonical(vt);
+
+        if (!is_point_locked_by_this_thread(vt.first->point()))
+        {
+          std::cout << std::endl << "not locked" << std::endl;
+          CGAL_assertion(false);
+        }
+        if (!is_point_locked_by_this_thread(vt.second->point()))
+        {
+          std::cout << std::endl << "not locked" << std::endl;
+          CGAL_assertion(false);
+        }
+        if (!is_point_locked_by_this_thread(vt.third->point()))
+        {
+          std::cout << std::endl << "not locked" << std::endl;
+          CGAL_assertion(false);
+        }
+
         inner_map[vt]= f;
       }
     }
@@ -4853,10 +4894,41 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
         Vertex_triple vt_aux = make_vertex_triple(f);
         Vertex_triple vt(vmap[vt_aux.first], vmap[vt_aux.third], vmap[vt_aux.second]);
         make_canonical(vt);
+
+        if (!is_point_locked_by_this_thread(vt.first->point()))
+        {
+          std::cout << std::endl << "not locked" << std::endl;
+          CGAL_assertion(false);
+        }
+        if (!is_point_locked_by_this_thread(vt.second->point()))
+        {
+          std::cout << std::endl << "not locked" << std::endl;
+          CGAL_assertion(false);
+        }
+        if (!is_point_locked_by_this_thread(vt.third->point()))
+        {
+          std::cout << std::endl << "not locked" << std::endl;
+          CGAL_assertion(false);
+        }
+
         inner_map[vt]= f;
       }
     }
   }
+  maps << "\ninner_map contains :\n";
+  for (auto omp : inner_map)
+  {
+    Vertex_triple vt = omp.first;
+    maps << &*(vt.first) << " " << &*(vt.second) << " " << &*(vt.third) << "\n";
+  }
+  maps << "\nouter_map contains :\n";
+  for (auto omp : outer_map)
+  {
+    Vertex_triple vt = omp.first;
+    maps << &*(vt.first) << " " << &*(vt.second) << " " << &*(vt.third) << "\n";
+  }
+
+
   // Grow inside the hole, by extending the surface
   while(! outer_map.empty())
   {
@@ -4870,11 +4942,68 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
       // because the infinite vertices are different
     }
 
+    if (!is_point_locked_by_this_thread(oit->first.first->point()))
+    {
+      std::cout << std::endl << "not locked" << std::endl;
+      CGAL_assertion(false);
+    }
+    if (!is_point_locked_by_this_thread(oit->first.second->point()))
+    {
+      std::cout << std::endl << "not locked" << std::endl;
+      CGAL_assertion(false);
+    }
+    if (!is_point_locked_by_this_thread(oit->first.third->point()))
+    {
+      std::cout << std::endl << "not locked" << std::endl;
+      CGAL_assertion(false);
+    }
+
+
+    // check if canonical order has changed
     typename Vertex_triple_Facet_map::value_type o_vt_f_pair = *oit;
     Cell_handle o_ch = o_vt_f_pair.second.first;
     unsigned int o_i = o_vt_f_pair.second.second;
 
+    Vertex_triple vtaux = o_vt_f_pair.first;
+    Vertex_triple vtauxcheck = o_vt_f_pair.first;
+    make_canonical(vtauxcheck);
+    if (vtaux != vtauxcheck)
+    {
+      maps << "make_canonical issue :\n"
+        << "\t from outer_map : "
+          << &*(vtaux.first) << " " << &*(vtaux.second) << " " << &*(vtaux.third) << "\n"
+        << "\t after make_canonical : "
+          << &*(vtauxcheck.first) << " " << &*(vtauxcheck.second) << " " << &*(vtauxcheck.third) << "\n";
+      std::cerr << maps.str() << std::endl;
+
+      CGAL_assertion(vtaux != vtauxcheck);
+    }
+    // canonical order has not changed
+
     typename Vertex_triple_Facet_map::iterator iit = inner_map.find(o_vt_f_pair.first);
+    if (iit == inner_map.end())
+    {
+      std::cout << "\niit == inner_map.end()" << std::endl;
+      std::cout << "\ninfinite = " << std::boolalpha << inf << std::endl;
+
+      maps << "\nat crash, outer_map contains :\n";
+      for (auto omp : outer_map)
+      {
+        Vertex_triple vt = omp.first;
+        maps << &*(vt.first) << " " << &*(vt.second) << " " << &*(vt.third) << "\n";
+      }
+
+      Vertex_triple vt = o_vt_f_pair.first;
+      maps << "Error with triple :\n"
+        << &*(vt.first) << " " << &*(vt.second) << " " << &*(vt.third) << "\n";
+      std::cerr << maps.str() << std::endl;
+
+//      Vertex_triple vto = o_vt_f_pair.first;
+//      std::swap(vto.second, vto.third);
+//      iit = inner_map.find(vto);
+//      if (iit == inner_map.end())
+//        std::cout << "\nAFTER SWAP, iit == inner_map.end()" << std::endl;
+    }
     CGAL_triangulation_assertion(iit != inner_map.end());
     typename Vertex_triple_Facet_map::value_type i_vt_f_pair = *iit;
     Cell_handle i_ch = i_vt_f_pair.second.first;
@@ -4902,7 +5031,12 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
         if(oit2 == outer_map.end())
         {
           std::swap(vt.second,vt.third);
-          outer_map[vt]= f;
+//          if(outer_map.find(vt) != outer_map.end())
+//            maps << "outer_map contains vt!" << std::endl; 
+//          maps << "swap " << &*(vt.second) << " and " << &*(vt.third) << "\n";
+//          maps << "\tfirst = " << &*(vt.first) << std::endl;
+//          if (outer_map.find(vt) == outer_map.end())
+            outer_map[vt]= f;
         }
         else
         {
@@ -4912,6 +5046,10 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
           int o_i2 = o_vt_f_pair2.second.second;
           o_ch2->set_neighbor(o_i2,new_ch);
           new_ch->set_neighbor(i, o_ch2);
+
+          maps << "erase " << &*(o_vt_f_pair2.first.first) << " " << &*(o_vt_f_pair2.first.second)
+            << " " << &*(o_vt_f_pair2.first.third) << std::endl;
+
           outer_map.erase(oit2);
         }
       }

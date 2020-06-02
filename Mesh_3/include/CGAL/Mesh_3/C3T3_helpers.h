@@ -2560,6 +2560,17 @@ update_mesh_topo_change(const Vertex_handle& old_vertex,
   if (could_lock_zone && *could_lock_zone == false)
     return std::make_pair(false, Vertex_handle());
 
+  bool lock_done = true;
+  for(Cell_handle c : removal_conflict_cells)
+    lock_done = lock_done && tr_.try_lock_cell(c->neighbor(c->index(old_vertex)));
+  for(Facet f : insertion_conflict_boundary)
+    lock_done = lock_done && tr_.try_lock_cell(f.first->neighbor(f.second));
+  if (!lock_done)
+  {
+    *could_lock_zone = false;
+    return std::make_pair(false, Vertex_handle());
+  }
+
   if(insertion_conflict_boundary.empty())
     return std::make_pair(false, old_vertex); // new_location is a vertex already
 
