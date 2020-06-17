@@ -1718,8 +1718,22 @@ nearest_power_vertex(const Bare_point& p, Cell_handle start) const
   vs.reserve(32);
   while(true)
   {
+//    if(!is_point_locked_by_this_thread(nearest->point()))
+//      abort(); 
+    std::vector<Cell_handle> icells;
+    incident_cells_threadsafe(nearest, std::back_inserter(icells));
+
     Vertex_handle tmp = nearest;
-    adjacent_vertices(nearest, std::back_inserter(vs));
+    for (auto ic : icells)
+    {
+      for (int i = 0; i < 4; ++i)
+      {
+        if(ic->vertex(i) != nearest
+          && std::find(vs.begin(), vs.end(), ic->vertex(i)) == vs.end())
+          vs.push_back(ic->vertex(i));
+      }
+    }
+    //    adjacent_vertices(nearest, std::back_inserter(vs));
     for(typename std::vector<Vertex_handle>::const_iterator
          vsit = vs.begin(); vsit != vs.end(); ++vsit)
       tmp = nearest_power_vertex(p, tmp, *vsit);
