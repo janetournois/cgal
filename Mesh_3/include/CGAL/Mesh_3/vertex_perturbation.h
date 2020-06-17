@@ -488,7 +488,7 @@ protected:
 
     unsigned int i = 0;
     // Concurrent-safe version
-    if (could_lock_zone)
+    if (could_lock_zone && *could_lock_zone)
     {
       // as long as no topological change takes place
       while(Th().no_topological_change__without_set_point(c3t3.triangulation(),
@@ -520,8 +520,12 @@ protected:
       }
     }
 
+    if(!c3t3.triangulation().is_point_locked_by_this_thread(v->point()))
+      abort();
+
     // Topology could not change moving this vertex
     if ( i > max_step_nb_ ||
+         !c3t3.triangulation().try_lock_point(final_loc) ||
          Th().inside_protecting_balls(c3t3.triangulation(), v, final_loc) )
       return std::make_pair(false, v);
 

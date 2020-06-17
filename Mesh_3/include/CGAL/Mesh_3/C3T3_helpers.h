@@ -2560,16 +2560,16 @@ update_mesh_topo_change(const Vertex_handle& old_vertex,
   if (could_lock_zone && *could_lock_zone == false)
     return std::make_pair(false, Vertex_handle());
 
-  bool lock_done = true;
-  for(Cell_handle c : removal_conflict_cells)
-    lock_done = lock_done && tr_.try_lock_cell(c->neighbor(c->index(old_vertex)));
-  for(Facet f : insertion_conflict_boundary)
-    lock_done = lock_done && tr_.try_lock_cell(f.first->neighbor(f.second));
-  if (!lock_done)
-  {
-    *could_lock_zone = false;
-    return std::make_pair(false, Vertex_handle());
-  }
+//  bool lock_done = true;
+//  for(Cell_handle c : removal_conflict_cells)
+//    lock_done = lock_done && tr_.try_lock_cell(c->neighbor(c->index(old_vertex)));
+//  for(Facet f : insertion_conflict_boundary)
+//    lock_done = lock_done && tr_.try_lock_cell(f.first->neighbor(f.second));
+//  if (!lock_done)
+//  {
+//    *could_lock_zone = false;
+//    return std::make_pair(false, Vertex_handle());
+//  }
 
   if(insertion_conflict_boundary.empty())
     return std::make_pair(false, old_vertex); // new_location is a vertex already
@@ -2579,6 +2579,10 @@ update_mesh_topo_change(const Vertex_handle& old_vertex,
   std::set_union(insertion_conflict_cells.begin(), insertion_conflict_cells.end(),
                  removal_conflict_cells.begin(), removal_conflict_cells.end(),
                  std::back_inserter(conflict_cells));
+
+  for(Cell_handle cc : conflict_cells)
+    if(!tr_.is_cell_locked_by_this_thread(cc))
+      abort();
 
   // Backup metadata
   std::set<Cell_data_backup> cells_backup;
@@ -3082,10 +3086,11 @@ move_point(const Vertex_handle& old_vertex,
     lock_outdated_cells();
     std::copy(incident_cells_.begin(),incident_cells_.end(),
       std::inserter(outdated_cells_set, outdated_cells_set.end()));
-    unlock_outdated_cells();
 
     Vertex_handle new_vertex =
       move_point_no_topo_change(old_vertex, move, new_position);
+
+    unlock_outdated_cells();
 
     // Don't "unlock_all_elements" here, the caller may need it to do it himself
     return new_vertex;
@@ -3241,12 +3246,19 @@ move_point_topo_change_conflict_zone_known(
                                              //o.w. deleted_cells will point to null pointer or so and crash
                                              const
 {
+  if(!tr_.try_lock_point(new_position))
+    return old_vertex;
+
   Weighted_point old_position = tr_.point(old_vertex); // intentional copy
   // make one set with conflict zone
   Cell_set conflict_zone;
   std::set_union(insertion_conflict_cells_begin, insertion_conflict_cells_end,
                  removal_conflict_cells_begin, removal_conflict_cells_end,
                  std::inserter(conflict_zone, conflict_zone.end()));
+
+  for(Cell_handle c : conflict_zone)
+    if(!tr_.is_cell_locked_by_this_thread(c))
+      abort();
 
   // Remove conflict zone cells from c3t3 (they will be deleted by insert/remove)
   remove_cells_and_facets_from_c3t3(conflict_zone.begin(), conflict_zone.end());
@@ -3262,6 +3274,10 @@ move_point_topo_change_conflict_zone_known(
                                                 insertion_conflict_cells_end,
                                                 insertion_boundary_facet.first,
                                                 insertion_boundary_facet.second);
+
+  std::vector<Cell_handle> new_incident_cells;
+  if(!tr_.try_lock_and_get_incident_cells(new_vertex, new_incident_cells))
+    abort();
 
   // If new_position is hidden, update what should be and return default constructed handle
   if ( Vertex_handle() == new_vertex )
@@ -3837,7 +3853,15 @@ get_conflict_zone_topo_change(const Vertex_handle& v,
   // Get triangulation_vertex incident cells : removal conflict zone
   // TODO: hasn't it already been computed in "perturb_vertex" (when getting the slivers)?
   // We don't try to lock the incident cells since they've already been locked
-  tr_.incident_cells_threadsafe(v, removal_conflict_cells);
+  std::vector<Cell_handle> cells;
+  bool could_lock = tr_.try_lock_and_get_incident_cells(v, cells);
+  if (!could_lock)
+  {
+    *could_lock_zone = false;
+    return;
+  }  //incident_cells_threadsafe(v, removal_conflict_cells);
+  for(Cell_handle c : cells)
+    *removal_conflict_cells++ = c;
 
   // Get conflict_point conflict zone
   int li=0;

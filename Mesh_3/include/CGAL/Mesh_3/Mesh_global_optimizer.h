@@ -520,6 +520,9 @@ private:
           FT size = cpp11::get<2>(m_moves[i]);
 
           // Move point
+          std::ostringstream dump;
+          dump << "thread " << std::this_thread::get_id()
+            << " : move vertex " << &*v;
           bool could_lock_zone;
           Vertex_handle new_v = m_helper.move_point(
             v, move, m_outdated_cells, m_moving_vertices, &could_lock_zone);
@@ -528,6 +531,8 @@ private:
             new_v = m_helper.move_point(
               v, move, m_outdated_cells, m_moving_vertices, &could_lock_zone);
           }
+
+          dump << " to vertex " << &*new_v << std::endl;
 
           // Restore size in meshing_info data
           new_v->set_meshing_info(size);

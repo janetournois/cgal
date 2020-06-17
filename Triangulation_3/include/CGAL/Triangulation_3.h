@@ -78,7 +78,7 @@
 # include <tbb/scalable_allocator.h>
 #endif
 
-#define CGAL_TRIANGULATION_3_USE_THE_4_POINTS_CONSTRUCTOR
+//#define CGAL_TRIANGULATION_3_USE_THE_4_POINTS_CONSTRUCTOR
 
 namespace CGAL {
 
@@ -1552,10 +1552,8 @@ protected:
 private:
   typedef Facet Edge_2D;
   typedef Triple<Vertex_handle,Vertex_handle,Vertex_handle> Vertex_triple;
-  typedef typename Base::template Vertex_triple_Facet_map_generator<
-  Vertex_triple, Facet>::type Vertex_triple_Facet_map;
-  typedef typename Base::template Vertex_handle_unique_hash_map_generator<
-  Vertex_handle>::type Vertex_handle_unique_hash_map;
+  typedef std::map<Vertex_triple, Facet> Vertex_triple_Facet_map;
+  typedef std::map<Vertex_handle, Vertex_handle> Vertex_handle_unique_hash_map;
 
   Vertex_triple make_vertex_triple(const Facet& f) const;
   void make_canonical(Vertex_triple& t) const;
@@ -4097,15 +4095,7 @@ make_canonical(Vertex_triple& t) const
       t.second = tmp;
   }
 
-  if (!(t.first < t.second && t.second < t.third))
-  {
-    std::cout << "check order" << std::endl;
-    if(t.first < t.second && t.first < t.third)
-      std::cout << "first is first" << std::endl;
-    else
-      std::cout << "??????" << std::endl;
-  }
-//  CGAL_assertion(t.first < t.second && t.second < t.third);
+  CGAL_assertion(t.first < t.second && t.first < t.third);
 }
 
 template < class GT, class Tds, class Lds >
@@ -4624,27 +4614,42 @@ make_hole_3D(Vertex_handle v,
 
   incident_cells(v, std::back_inserter(hole));
 
-  for(Cell_handle c : hole)
-    CGAL_assertion(is_cell_locked_by_this_thread(c));
+#ifdef DEBUG_PARALLEL
+  for (Cell_handle c : hole)
+  {
+    if (!is_cell_locked_by_this_thread(c))
+    {
+      abort();
+    }
+  }
+#endif
 
+  std::vector<Facet> hole_facets;
   for(typename std::vector<Cell_handle>::iterator cit = hole.begin(),
                                                   end = hole.end();
       cit != end; ++cit)
   {
     int indv = (*cit)->index(v);
     Cell_handle opp_cit = (*cit)->neighbor(indv);
-//    if(perturb_started && !is_cell_locked_by_this_thread(opp_cit))
-//      std::cerr << "neighbor not locked" << std::endl;
-////    CGAL_assertion(is_cell_locked_by_this_thread(opp_cit));
     Facet f(opp_cit, opp_cit->index(*cit));
     Vertex_triple vt = make_vertex_triple(f);
     make_canonical(vt);
     outer_map[vt] = f;
+
+    hole_facets.push_back(f);
+
     for(int i=0; i<4; i++)
     {
       if(i != indv)
         (*cit)->vertex(i)->set_cell(opp_cit);
     }
+  }
+
+  if (perturb_started)
+  {
+    std::ostringstream oss;
+    oss << std::this_thread::get_id() << "_hole_facets.off";
+    dump_facets_off(hole_facets.begin(), hole_facets.end(), oss.str().c_str());
   }
 }
 
@@ -4743,8 +4748,24 @@ VertexRemover&
 Triangulation_3<Gt,Tds,Lds>::
 remove_3D(Vertex_handle v, VertexRemover& remover)
 {
+  std::ostringstream dump;
+
   std::vector<Cell_handle> hole;
   hole.reserve(64);
+
+  std::vector<Vertex_handle> vertices1;
+  vertices1.reserve(64);
+  adjacent_vertices(v, std::back_inserter(vertices1));
+  std::set<Vertex_handle> adj_vertices1(vertices1.begin(), vertices1.end());
+
+  for (Vertex_handle va : adj_vertices1)
+  {
+    if (!is_point_locked_by_this_thread(va->point()))
+      std::cerr << "thread " << std::this_thread::get_id() << " : "
+      << "adj_vertices1 BEFORE make_hole_3D vertex : " << &* va
+      << "point " << va->point().point()
+      << "not locked!" << std::endl;
+  }
 
   // Construct the set of vertex triples on the boundary
   // with the facet just behind
@@ -4755,9 +4776,9 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
   CGAL_assertion(remover.hidden_points_begin() == remover.hidden_points_end());
 
   // Output the hidden points.
-  for(typename std::vector<Cell_handle>::iterator hi = hole.begin(),
-                                                  hend = hole.end();
-      hi != hend; ++hi)
+  for (typename std::vector<Cell_handle>::iterator hi = hole.begin(),
+    hend = hole.end();
+    hi != hend; ++hi)
   {
     remover.add_hidden_points(*hi);
   }
@@ -4769,65 +4790,119 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
   vertices.reserve(64);
   adjacent_vertices(v, std::back_inserter(vertices));
 
-  for (Vertex_handle vv : vertices)
+  // check consistency between vertices and hole
+  std::set<Vertex_handle> adj_vertices(vertices.begin(), vertices.end());
+  for (Vertex_handle va : adj_vertices)
   {
-    if (!is_point_locked_by_this_thread(vv->point()))
+    if (!is_point_locked_by_this_thread(va->point()))
+      std::cerr << "thread " << std::this_thread::get_id() << " : "
+      << "adj_vertices AFTER make_hole_3D vertex : " << &*va
+      << "point " << va->point().point()
+      << "not locked!" << std::endl;
+  }
+
+  std::set<Vertex_handle> hole_vertices;
+  for (Cell_handle c : hole)
+  {
+    for (int i = 0; i < 4; ++i)
     {
-      std::cout << std::endl << "not locked" << std::endl;
-      CGAL_assertion(false);
+      if (c->vertex(i) != v)
+        hole_vertices.insert(c->vertex(i));
     }
   }
-  // create a Delaunay triangulation of the points on the boundary
-  // and make a map from the vertices in remover.tmp towards the vertices
-  // in *this
+  for (Vertex_handle va : hole_vertices)
+  {
+    if (!is_point_locked_by_this_thread(va->point()))
+      std::cerr << "thread " << std::this_thread::get_id() << " : "
+      << "hole_vertices AFTER make_hole_3D vertex : " << &*va
+      << "point " << va->point().point()
+      << "not locked!" << std::endl;
+  }
+
+  if (adj_vertices1 != adj_vertices || adj_vertices != hole_vertices)
+  {
+    std::cerr << "adj_vertices entering remove_3D : " << adj_vertices1.size() << std::endl;
+    std::cerr << "hole_vertices                   : " << hole_vertices.size() << std::endl;
+    std::cerr << "adj_vertices after make_hole_3D : " << adj_vertices.size() << std::endl;
+    abort();
+  }
+  CGAL_assertion(adj_vertices1 == adj_vertices);
+
+  if (hole_vertices != adj_vertices)
+  {
+    std::ostringstream vss;
+    vss.precision(17);
+    vss << "\nThread " << std::this_thread::get_id() << std::endl;
+    vss << "Remove vertex " << &*v << std::endl;
+    vss << "Point " << v->point().point() << std::endl;
+ 
+    vss << "\nVertices in adjacent_vertices but not in hole_vertices :" << std::endl;
+    for (Vertex_handle vadj : adj_vertices)
+    {
+      if(hole_vertices.find(vadj) == hole_vertices.end())
+        vss << "infinite  = " << std::boolalpha
+          << (vadj == infinite_vertex())
+          << " p = " << vadj->point().point() << std::endl;
+    }
+    vss << "\nVertices in hole_vertices but not in adjacent_vertices :" << std::endl;
+    for (Vertex_handle vhole : hole_vertices)
+    {
+      if (adj_vertices.find(vhole) == adj_vertices.end())
+        vss << "infinite  = " << std::boolalpha
+        << (vhole == infinite_vertex())
+        << " p = " << vhole->point().point() << std::endl;
+    }
+
+    std::vector<Facet> holefacets;
+    for (Cell_handle chole : hole)
+    {
+      holefacets.push_back(Facet(chole, chole->index(v)));
+    }
+    std::ostringstream oss4;
+    oss4 << std::this_thread::get_id() << "_hole_facets.off";
+    dump_facets_off(holefacets.begin(), holefacets.end(), oss4.str().c_str());
+
+    vss << "\nAdjacent vertices :" << std::endl;
+    for(Vertex_handle va : vertices)
+      vss << va->point().point() << std::endl;
+
+    std::cout << vss.str() << std::endl;
+    abort();
+  }
+//  CGAL_assertion(hole_vertices == adj_vertices);
+
+  dump << "vertices : " << std::endl;
+  //  for (Vertex_handle vv : vertices)
+  //  {
+  //    if (!is_point_locked_by_this_thread(vv->point()))
+  //    {
+  //      std::cout << std::endl << "not locked" << std::endl;
+  //      CGAL_assertion(false);
+  //    }
+  //  }
+    // create a Delaunay triangulation of the points on the boundary
+    // and make a map from the vertices in remover.tmp towards the vertices
+    // in *this
 
   unsigned int i = 0;
-  Vertex_handle_unique_hash_map vmap;
+  std::map<Vertex_handle, Vertex_handle> vmap;
+  std::map<Vertex_handle, Vertex_handle> rvmap;
+
   Cell_handle ch = Cell_handle();
-#ifdef CGAL_TRIANGULATION_3_USE_THE_4_POINTS_CONSTRUCTOR
-  size_t num_vertices = vertices.size();
-  if(num_vertices >= 5)
+  std::vector<double> weights;
+  for (Vertex_handle vi : vertices)
   {
-    for(int j = 0 ; j < 4 ; ++j)
+    if (!is_infinite(vi))
     {
-      if(is_infinite(vertices[j]))
-      {
-        std::swap(vertices[j], vertices[4]);
-        break;
-      }
-    }
+      dump << vi->point().point() << std::endl;
 
-    Orientation o = orientation(vertices[0]->point(),
-                                vertices[1]->point(),
-                                vertices[2]->point(),
-                                vertices[3]->point());
-
-    if(o == NEGATIVE)
-      std::swap(vertices[0], vertices[1]);
-
-    if(o != ZERO)
-    {
-      Vertex_handle vh1, vh2, vh3, vh4;
-      remover.tmp.init_tds(vertices[0]->point(), vertices[1]->point(),
-                           vertices[2]->point(), vertices[3]->point(),
-                           vh1, vh2, vh3, vh4);
-      ch = vh1->cell();
-      vmap[vh1] = vertices[0];
-      vmap[vh2] = vertices[1];
-      vmap[vh3] = vertices[2];
-      vmap[vh4] = vertices[3];
-      i = 4;
-    }
-  }
-#endif
-
-  for(; i < vertices.size(); i++)
-  {
-    if(! is_infinite(vertices[i]))
-    {
-      Vertex_handle vh = remover.tmp.insert(vertices[i]->point(), ch);
+      Vertex_handle vh = remover.tmp.insert(vi->point(), ch);
       ch = vh->cell();
-      vmap[vh] = vertices[i];
+      vmap[vh] = vi;
+      rvmap[vi] = vh;
+
+      CGAL_assertion(rvmap[vmap[vh]] == vh);
+      CGAL_assertion(vmap[rvmap[vi]] == vi);
     }
     else
     {
@@ -4843,22 +4918,144 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
   else
   {
     vmap[remover.tmp.infinite_vertex()] = infinite_vertex();
+    rvmap[infinite_vertex()] = remover.tmp.infinite_vertex();
+
+    std::vector<Facet> facets_tmp;
+    std::vector<Facet> facets_tr;
+
+    bool facets_ok = true;
+    for (Cell_handle chole : hole)
+    {
+      Facet fin(chole, chole->index(v));
+      Vertex_triple vt = make_vertex_triple(fin);
+      Vertex_triple vttmp(rvmap[vt.first], rvmap[vt.second], rvmap[vt.third]);
+
+      Cell_handle cc;
+      int vi, vj, vk;
+
+      bool isfacettmp = remover.tmp.is_facet(vttmp.first, vttmp.second, vttmp.third, cc, vi, vj, vk);
+      if (isfacettmp)
+      {
+        int vl = -1;
+        for (int l = 0; l < 4; ++l)
+        {
+          if (vi != l && vj != l && vk != l)
+          {
+            vl = l;
+            break;
+          }
+        }
+        CGAL_assertion(vl != -1);
+        facets_tmp.push_back(Facet(cc, vl));
+      }
+      else
+        facets_ok = false;
+    }
+
+    if (!facets_ok)
+    {
+      std::ostringstream oss;
+      oss << std::this_thread::get_id() << "_remover_tmp_facets_from_hole.off";
+      dump_facets_off(facets_tmp.begin(), facets_tmp.end(), oss.str().c_str());
+
+      std::ostringstream oss3;
+      oss3 << std::this_thread::get_id() << "_remover_tmp_all_facets.off";
+      dump_facets_off(remover.tmp.finite_facets_begin(),
+        remover.tmp.finite_facets_end(),
+        oss3.str().c_str());
+
+      std::ostringstream ossout;
+      ossout << "thread " << std::this_thread::get_id() << std::endl;
+      ossout << "remove vertex " << &*v << ", point = " << v->point().point() << std::endl;
+      std::cerr << ossout.str() << std::endl;
+      abort();
+    }
   }
 
   CGAL_triangulation_assertion(remover.tmp.dimension() == 3);
+  //if (perturb_started)
+  {
+    bool null_vertex_found = false;
+    std::ostringstream oss;
+    oss << "START Cell_iterator... thread " << std::this_thread::get_id() << "\n";
+    for (Cell_iterator it = remover.tmp.cells_begin(); it != remover.tmp.cells_end(); ++it)
+    {
+      for (int j = 0; j < 4; j++)
+      {
+        if (it->vertex(j) == Vertex_handle())
+        {
+          null_vertex_found = true;
+          oss << "vertex " << j << " = " << &*(it->vertex(j)) << " of cell " << &*it << " is NULL" << std::endl;
+          oss << "cell is infinite : " << std::boolalpha << (remover.tmp.is_infinite(it)) << std::endl;
+          oss << "remover.tmp not valid" << std::endl
+            << "dimension = " << remover.tmp.dimension() << "\n"
+            << "nbv = " << remover.tmp.number_of_vertices() << "\n"
+            << "nbc = " << remover.tmp.number_of_finite_cells() << "\n\n";
+
+        }
+      }
+    }
+    oss << "END Cell_iterator...\n";
+    if (null_vertex_found)
+      std::cerr << oss.str() << std::endl;
+  }
 
   // Construct the set of vertex triples of remover.tmp
   // We reorient the vertex triple so that it matches those from outer_map
   // Also note that we use the vertices of *this, not of remover.tmp
 
   std::ostringstream maps("");
-  maps << "remove v = " << &*v << 
-    " with thread " << std::this_thread::get_id() << "\n"
+  maps << "remove v = " << &*v
+    << ", p = " << v->point().point()
+    << " with thread " << std::this_thread::get_id() << "\n"
     "outer_map contains :\n";
+  bool facets_ok = true;
+  std::vector<Facet> facets_tmp;
   for (auto omp : outer_map)
   {
     Vertex_triple vt = omp.first;
+    Vertex_triple vttmp(rvmap[vt.first], rvmap[vt.second], rvmap[vt.third]);
+
     maps << &*(vt.first) << " " << &*(vt.second) << " " << &*(vt.third) << "\n";
+
+    Cell_handle cc;
+    int vi, vj, vk;
+
+    bool isfacettmp = remover.tmp.is_facet(vttmp.first, vttmp.second, vttmp.third, cc, vi, vj, vk);
+    if (isfacettmp)
+    {
+      int vl = -1;
+      for (int l = 0; l < 4; ++l)
+      {
+        if (vi != l && vj != l && vk != l)
+        {
+          vl = l;
+          break;
+        }
+      }
+      facets_tmp.push_back(Facet(cc, vl));
+    }
+    else
+      facets_ok = false;
+  }
+
+  if (!facets_ok)
+  {
+    std::ostringstream oss;
+    oss << std::this_thread::get_id() << "_remover_tmp_facets_from_outer_map.off";
+    dump_facets_off(facets_tmp.begin(), facets_tmp.end(), oss.str().c_str());
+
+    std::ostringstream oss3;
+    oss << std::this_thread::get_id() << "_remover_tmp_all_facets.off";
+    dump_facets_off(remover.tmp.finite_facets_begin(),
+      remover.tmp.finite_facets_end(),
+      oss3.str().c_str());
+
+    std::ostringstream ossout;
+    ossout << "thread " << std::this_thread::get_id() << std::endl;
+    ossout << "remove vertex " << &*v << ", point = " << v->point().point() << std::endl;
+    std::cerr << ossout.str() << std::endl;
+    abort();
   }
 
   if(inf)
@@ -4873,24 +5070,24 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
         Vertex_triple vt(vmap[vt_aux.first], vmap[vt_aux.third], vmap[vt_aux.second]);
         make_canonical(vt);
 
-        if (vt.first != infinite_vertex()
-          && !is_point_locked_by_this_thread(vt.first->point()))
-        {
-          std::cout << std::endl << "not locked" << std::endl;
-          CGAL_assertion(false);
-        }
-        if (vt.second != infinite_vertex()
-          && !is_point_locked_by_this_thread(vt.second->point()))
-        {
-          std::cout << std::endl << "not locked" << std::endl;
-          CGAL_assertion(false);
-        }
-        if (vt.third != infinite_vertex()
-          && !is_point_locked_by_this_thread(vt.third->point()))
-        {
-          std::cout << std::endl << "not locked" << std::endl;
-          CGAL_assertion(false);
-        }
+//        if (vt.first != infinite_vertex()
+//          && !is_point_locked_by_this_thread(vt.first->point()))
+//        {
+//          std::cout << std::endl << "not locked" << std::endl;
+//          CGAL_assertion(false);
+//        }
+//        if (vt.second != infinite_vertex()
+//          && !is_point_locked_by_this_thread(vt.second->point()))
+//        {
+//          std::cout << std::endl << "not locked" << std::endl;
+//          CGAL_assertion(false);
+//        }
+//        if (vt.third != infinite_vertex()
+//          && !is_point_locked_by_this_thread(vt.third->point()))
+//        {
+//          std::cout << std::endl << "not locked" << std::endl;
+//          CGAL_assertion(false);
+//        }
 
         inner_map[vt]= f;
       }
@@ -4898,6 +5095,9 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
   }
   else
   {
+    CGAL_assertion(remover.tmp.is_valid());
+
+    boost::unordered_map<std::set<Vertex_handle>, int> inner_map_tr;
     for(Finite_cells_iterator it = remover.tmp.finite_cells_begin(),
                               end = remover.tmp.finite_cells_end(); it != end; ++it)
     {
@@ -4907,27 +5107,40 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
         Vertex_triple vt_aux = make_vertex_triple(f);
         Vertex_triple vt(vmap[vt_aux.first], vmap[vt_aux.third], vmap[vt_aux.second]);
         make_canonical(vt);
-
-        if (vt.first != infinite_vertex()
-          && !is_point_locked_by_this_thread(vt.first->point()))
-        {
-          std::cout << std::endl << "not locked" << std::endl;
-          CGAL_assertion(false);
-        }
-        if (vt.second != infinite_vertex()
-          && !is_point_locked_by_this_thread(vt.second->point()))
-        {
-          std::cout << std::endl << "not locked" << std::endl;
-          CGAL_assertion(false);
-        }
-        if (vt.third != infinite_vertex()
-          && !is_point_locked_by_this_thread(vt.third->point()))
-        {
-          std::cout << std::endl << "not locked" << std::endl;
-          CGAL_assertion(false);
-        }
-
         inner_map[vt]= f;
+        std::set<Vertex_handle> vset;
+        vset.insert(vt.first);
+        vset.insert(vt.second);
+        vset.insert(vt.third);
+        CGAL_assertion(vset.size() == 3);
+        if (inner_map_tr.find(vset) == inner_map_tr.end())
+          inner_map_tr.insert(std::make_pair(vset, 1));
+        else
+          inner_map_tr[vset]++;
+      }
+    }
+
+    for (auto vn : inner_map_tr)
+    {
+      if (vn.second == 2)
+        continue;
+      else if (vn.second == 1)
+      {
+        Cell_handle c;
+        std::set<Vertex_handle>::iterator it = vn.first.begin();
+        Vertex_handle v0 = *it; ++it;
+        CGAL_assertion(is_vertex(v0));
+        Vertex_handle v1 = *it; ++it;
+        CGAL_assertion(is_vertex(v1));
+        Vertex_handle v2 = *it;
+        CGAL_assertion(is_vertex(v2));
+        //int i0, i1, i2;
+        //bool facet = is_facet(v0, v1, v2, c, i0, i1, i2);
+      }
+      else
+      {
+        std::cerr << "tr vn.second = " << vn.second << std::endl;
+        abort();
       }
     }
   }
@@ -4937,13 +5150,48 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
     Vertex_triple vt = omp.first;
     maps << &*(vt.first) << " " << &*(vt.second) << " " << &*(vt.third) << "\n";
   }
-  maps << "\nouter_map contains :\n";
-  for (auto omp : outer_map)
-  {
-    Vertex_triple vt = omp.first;
-    maps << &*(vt.first) << " " << &*(vt.second) << " " << &*(vt.third) << "\n";
-  }
 
+
+  // each facet in inner_map should appear :
+  // once if it also is in outer_map
+  // twice otherwise
+//  if (perturb_started)
+//  {
+    int nb_once = 0;
+    int nb_twice = 0;
+    for (auto vtf : inner_map)
+    {
+      Vertex_triple vt = vtf.first;
+
+      if (outer_map.find(vt) == outer_map.end())
+      {
+        //if not found in outer_map, it should be twice in inner_map
+        std::swap(vt.second, vt.third);
+        if (inner_map.find(vt) == inner_map.end())
+        {
+          ++nb_once;
+          maps << "found once in inner map : " << &*(vt.first) << " " << &*(vt.second) << " " << &*(vt.third) << "\n";
+        }
+        else
+        {
+          ++nb_twice;
+          //maps << "found twice in inner map : " << &*(vt.first) << " " << &*(vt.second) << " " << &*(vt.third) << "\n";
+        }
+      }
+      else
+      {
+        //if found int outer_map, it should be there only once
+        std::swap(vt.second, vt.third);
+        if (outer_map.find(vt) != outer_map.end())
+        {
+          CGAL_assertion(false);
+          abort();
+        }
+      }
+    }
+    maps << "found once : " << nb_once << std::endl;
+    maps << "found twice : " << nb_twice << std::endl;
+//  }
 
   // Grow inside the hole, by extending the surface
   while(! outer_map.empty())
@@ -4958,21 +5206,21 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
       // because the infinite vertices are different
     }
 
-    if (!is_point_locked_by_this_thread(oit->first.first->point()))
-    {
-      std::cout << std::endl << "not locked" << std::endl;
-      CGAL_assertion(false);
-    }
-    if (!is_point_locked_by_this_thread(oit->first.second->point()))
-    {
-      std::cout << std::endl << "not locked" << std::endl;
-      CGAL_assertion(false);
-    }
-    if (!is_point_locked_by_this_thread(oit->first.third->point()))
-    {
-      std::cout << std::endl << "not locked" << std::endl;
-      CGAL_assertion(false);
-    }
+//    if (!is_point_locked_by_this_thread(oit->first.first->point()))
+//    {
+//      std::cout << std::endl << "not locked" << std::endl;
+//      CGAL_assertion(false);
+//    }
+//    if (!is_point_locked_by_this_thread(oit->first.second->point()))
+//    {
+//      std::cout << std::endl << "not locked" << std::endl;
+//      CGAL_assertion(false);
+//    }
+//    if (!is_point_locked_by_this_thread(oit->first.third->point()))
+//    {
+//      std::cout << std::endl << "not locked" << std::endl;
+//      CGAL_assertion(false);
+//    }
 
 
     // check if canonical order has changed
@@ -4999,8 +5247,8 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
     typename Vertex_triple_Facet_map::iterator iit = inner_map.find(o_vt_f_pair.first);
     if (iit == inner_map.end())
     {
-      std::cout << "\niit == inner_map.end()" << std::endl;
-      std::cout << "\ninfinite = " << std::boolalpha << inf << std::endl;
+      maps << "\niit == inner_map.end()" << std::endl;
+      maps << "\ninfinite = " << std::boolalpha << inf << std::endl;
 
       maps << "\nat crash, outer_map contains :\n";
       for (auto omp : outer_map)
@@ -5013,12 +5261,22 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
       maps << "Error with triple :\n"
         << &*(vt.first) << " " << &*(vt.second) << " " << &*(vt.third) << "\n";
       std::cerr << maps.str() << std::endl;
-
-//      Vertex_triple vto = o_vt_f_pair.first;
-//      std::swap(vto.second, vto.third);
-//      iit = inner_map.find(vto);
-//      if (iit == inner_map.end())
-//        std::cout << "\nAFTER SWAP, iit == inner_map.end()" << std::endl;
+  
+      std::ofstream os("remover_tmp.polylines.txt");
+      for (Finite_cells_iterator it = remover.tmp.finite_cells_begin(),
+        end = remover.tmp.finite_cells_end(); it != end; ++it)
+      {
+        for (int i = 0; i < 4; ++i)
+        {
+          Facet f(it, i);
+          Vertex_triple vt = make_vertex_triple(f);
+          os << "3 " << vt.first->point().point() << " "
+            << vt.second->point().point() << " "
+            << vt.third->point().point() << " "
+            << vt.first->point().point() << std::endl;
+        }
+      }
+      os.close();
     }
     CGAL_triangulation_assertion(iit != inner_map.end());
     typename Vertex_triple_Facet_map::value_type i_vt_f_pair = *iit;
@@ -5052,9 +5310,8 @@ remove_3D(Vertex_handle v, VertexRemover& remover)
             maps << "outer_map contains vt!" << std::endl;
             maps << "swap " << &*(vt.second) << " and " << &*(vt.third) << "\n";
           }
-//          maps << "\tfirst = " << &*(vt.first) << std::endl;
-//          if (outer_map.find(vt) == outer_map.end())
-            outer_map[vt]= f;
+          maps << "outer_map insert " << &*(vt.first) << " " << &*(vt.second) << " " << &*(vt.third) << std::endl;
+          outer_map[vt]= f;
         }
         else
         {

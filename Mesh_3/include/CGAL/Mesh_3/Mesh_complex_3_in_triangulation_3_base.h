@@ -1013,7 +1013,12 @@ bbox() const
     result = result + tr_.point(vit).bbox();
   }
 
-  return result;
+  return result = Bbox_3(0.95 * result.xmin(),
+                         0.95 * result.ymin(),
+                         0.95 * result.zmin(),
+                         1.05 * result.xmax(),
+                         1.05 * result.ymax(),
+                         1.05 * result.zmax());
 }
 
 template <typename Tr, typename Ct>
