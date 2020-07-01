@@ -116,7 +116,6 @@ private:
   Visitor& m_visitor;
   Smoother m_vertex_smoother;//initialized with initial surface
 
-  C3t3* m_c3t3_pbackup;
   Triangulation* m_tr_pbackup; //backup to re-swap triangulations when done
 
 public:
@@ -133,7 +132,6 @@ public:
     , m_protect_boundaries(protect_boundaries)
     , m_cell_selector(cell_selector)
     , m_visitor(visitor)
-    , m_c3t3_pbackup(NULL)
     , m_tr_pbackup(&tr)
   {
     m_c3t3.triangulation().swap(tr);
@@ -146,39 +144,6 @@ public:
     CGAL::Tetrahedral_remeshing::debug::dump_facets_in_complex(m_c3t3,
       "00-facets_in_complex_after_init.off");
 #endif
-  }
-
-  Adaptive_remesher(C3t3& c3t3
-                    , const SizingFunction& sizing
-                    , const bool protect_boundaries
-                    , EdgeIsConstrainedMap ecmap
-                    , FacetIsConstrainedMap fcmap
-                    , CellSelector cell_selector
-                    , Visitor& visitor
-                   )
-    : m_c3t3()
-    , m_sizing(sizing)
-    , m_protect_boundaries(protect_boundaries)
-    , m_cell_selector(cell_selector)
-    , m_visitor(visitor)
-    , m_c3t3_pbackup(&c3t3)
-    , m_tr_pbackup(NULL)
-  {
-    m_c3t3.swap(c3t3);
-
-    init_c3t3(ecmap, fcmap);
-    m_vertex_smoother.init(m_c3t3, m_cell_selector);
-
-#ifdef CGAL_DUMP_REMESHING_STEPS
-    CGAL::Tetrahedral_remeshing::debug::dump_c3t3(m_c3t3, "00-init");
-    CGAL::Tetrahedral_remeshing::debug::dump_facets_in_complex(m_c3t3,
-      "00-facets_in_complex_after_init.off");
-#endif
-  }
-
-  bool input_is_c3t3() const
-  {
-    return m_c3t3_pbackup != NULL;
   }
 
   void split()
@@ -373,10 +338,7 @@ public:
 
   void finalize()
   {
-    if (m_c3t3_pbackup != NULL)
-      m_c3t3_pbackup->swap(m_c3t3);
-    else
-      m_tr_pbackup->swap(m_c3t3.triangulation());
+    m_tr_pbackup->swap(m_c3t3.triangulation());
   }
 
 private:
@@ -399,7 +361,7 @@ private:
       if (m_cell_selector(cit))
       {
         const Subdomain_index index = cit->subdomain_index();
-        if(!input_is_c3t3())
+        if(m_c3t3.is_in_complex(cit))
           m_c3t3.remove_from_complex(cit);
         m_c3t3.add_to_complex(cit, index);
 
@@ -407,18 +369,11 @@ private:
         ++nbc;
 #endif
       }
-      if (!input_is_c3t3())
+      for (int i = 0; i < 4; ++i)
       {
-        for (int i = 0; i < 4; ++i)
-        {
-          if (cit->vertex(i)->in_dimension() == -1)
-            cit->vertex(i)->set_dimension(3);
-        }
+        if (cit->vertex(i)->in_dimension() == -1)
+          cit->vertex(i)->set_dimension(3);
       }
-#ifdef CGAL_TETRAHEDRAL_REMESHING_DEBUG
-      else if (input_is_c3t3() && m_c3t3.is_in_complex(cit))
-        ++nbc;
-#endif
     }
 
     //tag facets
@@ -431,7 +386,7 @@ private:
       if (s1 != s2
           || get(fcmap, f)
           || get(fcmap, mf)
-          || (m_c3t3_pbackup == NULL && f.first->is_facet_on_surface(f.second)))
+          || f.first->is_facet_on_surface(f.second))
       {
         Surface_patch_index patch = f.first->surface_patch_index(f.second);
         if(patch == Surface_patch_index())

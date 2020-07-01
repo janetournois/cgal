@@ -28,6 +28,8 @@
 #include <CGAL/Polyhedral_mesh_domain_with_features_3.h>
 #include <CGAL/Mesh_domain_with_polyline_features_3.h>
 
+#include <CGAL/Triangulation_3.h>
+
 #include <CGAL/tags.h>
 
 #ifdef CGAL_MESH_3_DEMO_ACTIVATE_IMPLICIT_FUNCTIONS
@@ -89,6 +91,7 @@ typedef CGAL::Mesh_complex_3_in_triangulation_3<Tr> C3t3;
 
 typedef Tr::Geom_traits Geom_traits;
 
-// 3D complex
+// Triangulation for tetrahedral remeshing
+typedef CGAL::Triangulation_3<Geom_traits, Tr::Triangulation_data_structure> T3;
 
 #endif // CGAL_DEMO_MESH_3_C3T3_TYPE_H

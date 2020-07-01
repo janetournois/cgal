@@ -1,6 +1,6 @@
 #define CGAL_TETRAHEDRAL_REMESHING_VERBOSE
-//#define CGAL_DUMP_REMESHING_STEPS
-//#define CGAL_TETRAHEDRAL_REMESHING_DEBUG
+#define CGAL_DUMP_REMESHING_STEPS
+#define CGAL_TETRAHEDRAL_REMESHING_DEBUG
 //#define CGAL_TETRAHEDRAL_REMESHING_VERBOSE_PROGRESS
 //#define CGAL_TETRAHEDRAL_REMESHING_PROFILE
 //#define CGAL_TETRAHEDRAL_REMESHING_SMOOTH_SHARP_EDGES
@@ -106,11 +106,13 @@ public Q_SLOTS:
       QElapsedTimer time;
       time.start();
 
+      T3 t3 = CGAL::convert_to_triangulation_3(std::move(c3t3_item->c3t3()));
       CGAL::tetrahedral_isotropic_remeshing(
-          c3t3_item->c3t3(),
+          t3,
           target_length,
           CGAL::parameters::remesh_boundaries(!protect)
           .number_of_iterations(nb_iter));
+//      c3t3_item->c3t3().triangulation().swap(t3);
 
       std::cout << "Remeshing done (" << time.elapsed() << " ms)" << std::endl;
 
