@@ -142,7 +142,8 @@ public:
     if (not_an_edge)
     {
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
-      std::cout << "CollapseTriangulation::Not an edge..." << std::endl;
+      std::cout << "CollapseTriangulation::Not an edge...("
+        << point(v0_init->point()) << " " << point(v1_init->point()) <<")" << std::endl;
 #endif
       return E_PROBLEM;
     }
@@ -261,18 +262,17 @@ public:
         triangulation.tds().delete_cell(ch);
       }
 
-      for (Cell_handle cit : triangulation.finite_cell_handles())
-      {
-        if (!is_well_oriented(triangulation, cit))
-          return ORIENTATION_PROBLEM;
-        if (!triangulation.tds().is_valid(cit, true))
-          return C_PROBLEM;
-      }
-
       for (Vertex_handle vit : triangulation.finite_vertex_handles())
       {
         if (!triangulation.tds().is_valid(vit, true))
           return V_PROBLEM;
+      }
+      for (Cell_handle cit : triangulation.finite_cell_handles())
+      {
+        if (cit->subdomain_index() != 0 && !is_well_oriented(triangulation, cit))
+          return ORIENTATION_PROBLEM;
+        if (!triangulation.tds().is_valid(cit, true))
+          return C_PROBLEM;
       }
 
       //int si_nb_vh0 = nb_incident_subdomains(vh0, c3t3);
@@ -447,7 +447,7 @@ bool is_valid_collapse(const typename C3t3::Edge& edge,
 
     for (const Cell_handle ch : cells_to_check)
     {
-      if (!ch->has_vertex(v1))
+      if (!ch->has_vertex(v1) && c3t3.is_in_complex(ch))
       {
         //check orientation
         boost::array<Point, 4> pts = { ch->vertex(0)->point(),
@@ -458,6 +458,13 @@ bool is_valid_collapse(const typename C3t3::Edge& edge,
         if (CGAL::orientation(point(pts[0]), point(pts[1]), point(pts[2]), point(pts[3]))
             != CGAL::POSITIVE)
         {
+//          std::cout << "\nCollapse TO_V1 or TO_MIDPOINT. Bad orientation of :\t"
+//                    << point(pts[0]) << "\n"
+//                    << point(pts[1]) << "\n"
+//                    << point(pts[2]) << "\n"
+//                    << point(pts[3]) << "\n";
+//          std::cout << "New position is :\t" << new_pos << std::endl;
+
 #ifdef CGAL_DEBUG_TET_REMESHING_IN_PLUGIN
           if (in_cx)
           {
@@ -480,7 +487,7 @@ bool is_valid_collapse(const typename C3t3::Edge& edge,
 
     for (const Cell_handle ch : cells_to_check)
     {
-      if (!ch->has_vertex(v0))
+      if (!ch->has_vertex(v0) && c3t3.is_in_complex(ch))
       {
         //check orientation
         boost::array<Point, 4> pts = { ch->vertex(0)->point(),
@@ -491,6 +498,13 @@ bool is_valid_collapse(const typename C3t3::Edge& edge,
         if (CGAL::orientation(point(pts[0]), point(pts[1]), point(pts[2]), point(pts[3]))
             != CGAL::POSITIVE)
         {
+//          std::cout << "\nCollapse TO_V0 or TO_MIDPOINT. Bad orientation of :\t"
+//            << point(pts[0]) << "\n"
+//            << point(pts[1]) << "\n"
+//            << point(pts[2]) << "\n"
+//            << point(pts[3]) << "\n";
+//          std::cout << "New position is :\t" << new_pos << std::endl;
+
 #ifdef CGAL_DEBUG_TET_REMESHING_IN_PLUGIN
           if (in_cx)
           {
@@ -1022,9 +1036,14 @@ bool is_cells_set_manifold(const C3t3&,
   }
 
   for (const std::pair<EV, int>& evv : edges)
+  {
     if (evv.second != 2)
+    {
+//      std::cout << "Non manifold edge : "
+//        << point(evv.first.first->point()) << " " << point(evv.first.second->point()) << std::endl;
       return false;
-
+    }
+  }
   return true;
 }
 
@@ -1121,9 +1140,12 @@ typename C3t3::Vertex_handle collapse_edge(typename C3t3::Edge& edge,
     c3t3.triangulation().finite_incident_cells(v1_init,
       std::inserter(cells_to_insert, cells_to_insert.end()));
 
-    if(!is_cells_set_manifold(c3t3, cells_to_insert))
+    if (!is_cells_set_manifold(c3t3, cells_to_insert))
+    {
+//      std::cout << "Non Manifold cells set when collapsing "
+//        << point(v0->point()) << " " << point(v1->point()) << std::endl;
       return Vertex_handle();
-
+    }
     CollapseTriangulation<C3t3> local_tri(edge, cells_to_insert, collapse_type);
 
     Result_type res = local_tri.collapse();
@@ -1135,6 +1157,8 @@ typename C3t3::Vertex_handle collapse_edge(typename C3t3::Edge& edge,
 #endif
       return collapse(edge, collapse_type, c3t3);
     }
+    else if(res == ORIENTATION_PROBLEM)
+      std::cout << "Orientation problem in CollapseTriangulation" << std::endl;
   }
 #ifdef CGAL_DEBUG_TET_REMESHING_IN_PLUGIN
   else if (in_cx)

@@ -995,6 +995,9 @@ bool are_cell_orientations_valid(const Tr& tr)
   std::set<Facet> facets;
   for (const typename Tr::Cell_handle ch : tr.finite_cell_handles())
   {
+    if(ch->subdomain_index() == 0)
+      continue;
+
     const Point_3& p0 = point(ch->vertex(0)->point());
     const Point_3& p1 = point(ch->vertex(1)->point());
     const Point_3& p2 = point(ch->vertex(2)->point());

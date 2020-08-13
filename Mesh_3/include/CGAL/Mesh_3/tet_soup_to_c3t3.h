@@ -134,10 +134,10 @@ bool build_finite_cells(Tr& tr,
       vs[j]->set_dimension(3);
     }
 
-    // this assertion also tests for degeneracy
-    CGAL_assertion(CGAL::orientation(cp(tr.point(vs[0])), cp(tr.point(vs[1])),
-                                     cp(tr.point(vs[2])), cp(tr.point(vs[3])))
-                     == POSITIVE);
+//    // this assertion also tests for degeneracy
+//    CGAL_assertion(CGAL::orientation(cp(tr.point(vs[0])), cp(tr.point(vs[1])),
+//                                     cp(tr.point(vs[2])), cp(tr.point(vs[3])))
+//                     == POSITIVE);
 
     Cell_handle c = tr.tds().create_cell(vs[0], vs[1], vs[2], vs[3]);
     c->set_subdomain_index(tet[4]); // the cell's info keeps the reference of the tetrahedron

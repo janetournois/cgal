@@ -277,7 +277,11 @@ void tetrahedral_isotropic_remeshing(
 #endif
 
   // perform remeshing
+#ifdef CGAL_TETRAHEDRAL_REMESHING_NO_EXTRA_ITERATIONS
+  std::size_t nb_extra_iterations = 0;
+#else
   std::size_t nb_extra_iterations = 3;
+#endif
   remesher.remesh(max_it, nb_extra_iterations);
 
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
@@ -476,7 +480,11 @@ void tetrahedral_isotropic_remeshing(
 #endif
 
   // perform remeshing
+#ifdef CGAL_TETRAHEDRAL_REMESHING_NO_EXTRA_ITERATIONS
+  std::size_t nb_extra_iterations = 0;
+#else
   std::size_t nb_extra_iterations = 3;
+#endif
   remesher.remesh(max_it, nb_extra_iterations);
 
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
