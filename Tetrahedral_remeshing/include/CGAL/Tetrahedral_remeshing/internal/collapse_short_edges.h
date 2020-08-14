@@ -1179,7 +1179,7 @@ bool can_be_collapsed(const typename C3T3::Edge& e,
 }
 
 template<typename C3T3, typename CellSelector, typename Visitor>
-void collapse_short_edges(C3T3& c3t3,
+std::size_t collapse_short_edges(C3T3& c3t3,
                           const typename C3T3::Triangulation::Geom_traits::FT& low,
                           const typename C3T3::Triangulation::Geom_traits::FT& high,
                           const bool protect_boundaries,
@@ -1206,8 +1206,8 @@ void collapse_short_edges(C3T3& c3t3,
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
   std::cout << "Collapse short edges (" << low << ", " << high << ")...";
   std::cout.flush();
-  std::size_t nb_collapses = 0;
 #endif
+  std::size_t nb_collapses = 0;
   const FT sq_low = low*low;
   const FT sq_high = high*high;
 
@@ -1285,11 +1285,7 @@ void collapse_short_edges(C3T3& c3t3,
             short_edges.insert(short_edge(make_vertex_pair<T3>(eshort), sqlen));
         }
 
-        //debug::dump_c3t3(c3t3, "dump_after_collapse");
-        //CGAL_assertion(c3t3.triangulation().tds().is_valid());
-#ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
         ++nb_collapses;
-#endif
       }
 #ifdef CGAL_TETRAHEDRAL_REMESHING_DEBUG
       if (vh != Vertex_handle())
@@ -1307,6 +1303,8 @@ void collapse_short_edges(C3T3& c3t3,
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
   std::cout << " done (" << nb_collapses << " collapses)." << std::endl;
 #endif
+
+  return nb_collapses;
 }
 }
 }

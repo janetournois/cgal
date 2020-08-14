@@ -1130,7 +1130,7 @@ std::size_t flip_all_edges(const std::vector<VertexPair>& edges,
 }
 
 template<typename C3T3, typename CellSelector, typename Visitor>
-void flip_edges(C3T3& c3t3,
+std::size_t flip_edges(C3T3& c3t3,
                 const bool protect_boundaries,
                 CellSelector cell_selector,
                 Visitor& visitor)
@@ -1143,8 +1143,8 @@ void flip_edges(C3T3& c3t3,
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
   std::cout << "Flip edges...";
   std::cout.flush();
-  std::size_t nb_flips = 0;
 #endif
+  std::size_t nb_flips = 0;
 
   //const Flip_Criterion criterion = VALENCE_MIN_DH_BASED;
 
@@ -1180,15 +1180,15 @@ void flip_edges(C3T3& c3t3,
   //  flip_inside_edges(inside_edges);
   //else
   //{
-#ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
   nb_flips =
-#endif
     flip_all_edges(inside_edges, c3t3, MIN_ANGLE_BASED, visitor);
   //}
 
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
   std::cout << " done (" << nb_flips << " flips)." << std::endl;
 #endif
+
+  return nb_flips;
 }
 
 }//namespace internal

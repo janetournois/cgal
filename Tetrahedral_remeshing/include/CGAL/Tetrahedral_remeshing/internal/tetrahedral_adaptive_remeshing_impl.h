@@ -184,12 +184,13 @@ public:
     return m_c3t3_pbackup != NULL;
   }
 
-  void split()
+  std::size_t split()
   {
     CGAL_assertion(check_vertex_dimensions());
 
     const FT target_edge_length = m_sizing(CGAL::ORIGIN);
     const FT emax = FT(4)/FT(3) * target_edge_length;
+    std::size_t nb_splits =
     split_long_edges(m_c3t3, emax, m_protect_boundaries,
                      m_cell_selector, m_visitor);
 
@@ -204,15 +205,17 @@ public:
 #ifdef CGAL_DUMP_REMESHING_STEPS
     CGAL::Tetrahedral_remeshing::debug::dump_c3t3(m_c3t3, "1-split");
 #endif
+    return nb_splits;
   }
 
-  void collapse()
+  std::size_t collapse()
   {
     CGAL_assertion(check_vertex_dimensions());
 
     const FT target_edge_length = m_sizing(CGAL::ORIGIN);
     FT emin = FT(4)/FT(5) * target_edge_length;
     FT emax = FT(4)/FT(3) * target_edge_length;
+    std::size_t nb_collapses =
     collapse_short_edges(m_c3t3, emin, emax, m_protect_boundaries,
                          m_cell_selector, m_visitor);
 
@@ -225,10 +228,12 @@ public:
 #ifdef CGAL_DUMP_REMESHING_STEPS
     CGAL::Tetrahedral_remeshing::debug::dump_c3t3(m_c3t3, "2-collapse");
 #endif
+    return nb_collapses;
   }
 
-  void flip()
+  std::size_t flip()
   {
+    std::size_t nb_flips =
     flip_edges(m_c3t3, m_protect_boundaries,
                m_cell_selector, m_visitor);
 
@@ -241,6 +246,7 @@ public:
 #ifdef CGAL_DUMP_REMESHING_STEPS
     CGAL::Tetrahedral_remeshing::debug::dump_c3t3(m_c3t3, "3-flip");
 #endif
+    return nb_flips;
   }
 
   void smooth()
@@ -601,12 +607,16 @@ public:
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
       std::cout << "# Iteration " << it_nb << " #" << std::endl;
 #endif
+
+      std::size_t nb_splits = 0;
+      std::size_t nb_collapses = 0;
+      std::size_t nb_flips = 0;
       if (!resolution_reached())
       {
-        split();
-        collapse();
+        nb_splits = split();
+        nb_collapses = collapse();
       }
-      flip();
+      nb_flips = flip();
       smooth();
 
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
@@ -620,9 +630,13 @@ public:
       Tetrahedral_remeshing::internal::compute_statistics(
         tr(), m_cell_selector, ossi.str().c_str());
 #endif
+
+      if(nb_splits == 0 && nb_collapses == 0 && nb_flips == 0)
+        break;
     }
 
-    while (it_nb < max_it + nb_extra_iterations)
+    it_nb = 0;
+    while (it_nb < nb_extra_iterations)
     {
       ++it_nb;
 

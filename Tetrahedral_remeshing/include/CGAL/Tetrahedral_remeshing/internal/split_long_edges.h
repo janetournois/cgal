@@ -215,7 +215,7 @@ bool can_be_split(const typename C3T3::Edge& e,
 }
 
 template<typename C3T3, typename CellSelector, typename Visitor>
-void split_long_edges(C3T3& c3t3,
+std::size_t split_long_edges(C3T3& c3t3,
                       const typename C3T3::Triangulation::Geom_traits::FT& high,
                       const bool protect_boundaries,
                       CellSelector cell_selector,
@@ -238,8 +238,8 @@ void split_long_edges(C3T3& c3t3,
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
   std::cout << "Split long edges (" << high << ")...";
   std::cout.flush();
-  std::size_t nb_splits = 0;
 #endif
+  std::size_t nb_splits = 0;
   const FT sq_high = high*high;
 
   //collect long edges
@@ -289,18 +289,15 @@ void split_long_edges(C3T3& c3t3,
       visitor.before_split(tr, edge);
       Vertex_handle vh = split_edge(edge, c3t3);
 
-      if(vh != Vertex_handle())
+      if (vh != Vertex_handle())
+      {
         visitor.after_split(tr, vh);
+        ++nb_splits;
+      }
 
 #ifdef CGAL_TETRAHEDRAL_REMESHING_DEBUG
       if (vh != Vertex_handle())
         ofs << vh->point() << std::endl;
-#endif
-
-#if  defined(CGAL_TETRAHEDRAL_REMESHING_VERBOSE_PROGRESS) \
-|| defined(CGAL_TETRAHEDRAL_REMESHING_VERBOSE)
-      if (vh != Vertex_handle())
-        ++nb_splits;
 #endif
 
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE_PROGRESS
@@ -321,6 +318,8 @@ void split_long_edges(C3T3& c3t3,
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
   std::cout << " done (" << nb_splits << " splits)." << std::endl;
 #endif
+
+  return nb_splits;
 }
 
 } // internal
