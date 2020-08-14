@@ -320,7 +320,8 @@ public:
 
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
     std::cout << "Min dihedral angle : " << mindh << std::endl;
-    std::cout << "Peelable cells : " << peelable_cells.size() << std::endl;
+    std::cout << "Peelable cells : " << peelable_cells.size() << " ";
+    std::cout.flush();
 #endif
 
     for (auto c_i : peelable_cells)
@@ -368,9 +369,20 @@ public:
     CGAL::Tetrahedral_remeshing::debug::dump_c3t3(m_c3t3, "99-postprocess");
 #endif
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
-    std::cout << "(peeling removed " << nb_slivers_peel << " slivers)" << std::endl;
-    std::cout << "done." << std::endl;
+    std::cout << "(peeling removed " << nb_slivers_peel << " slivers) done." << std::endl;
+
+    mindh = 180.;
+    for (Cell_handle cit : tr().finite_cell_handles())
+    {
+      if (m_c3t3.is_in_complex(cit))
+      {
+        const double dh = min_dihedral_angle(tr(), cit);
+        mindh = (std::min)(dh, mindh);
+      }
+    }
+    std::cout << "Min dihedral angle : " << mindh << std::endl;
 #endif
+
     return nb_slivers_peel;
   }
 
