@@ -100,6 +100,12 @@ public Q_SLOTS:
       bool protect = ui.protect_checkbox->isChecked();
       bool smooth_edges = ui.smoothEdges_checkBox->isChecked();
 
+      std::cout << "Start Tetrahedral Remeshing : " << std::endl;
+      std::cout << "\tsize = " << target_length << std::endl
+        << "\tnb iterations = " << nb_iter << std::endl
+        << "\tprotect boundaries = " << std::boolalpha << protect << std::endl
+        << "\t1D smoothing = " << std::boolalpha << smooth_edges << std::endl;
+
       // wait cursor
       QApplication::setOverrideCursor(Qt::WaitCursor);
 
