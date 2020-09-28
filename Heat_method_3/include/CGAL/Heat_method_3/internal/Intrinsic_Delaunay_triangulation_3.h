@@ -37,6 +37,7 @@
 #include <set>
 #include <stack>
 #include <cmath>
+#include <limits>
 
 #ifndef DOXYGEN_RUNNING
 
@@ -219,11 +220,24 @@ private:
     Index a_i = get(edge_id_map, ed);
     Index b_i = get(edge_id_map, edge(hd2,m_intrinsic_tm));
     Index c_i = get(edge_id_map, edge(hd3,m_intrinsic_tm));
-    double a = edge_lengths[a_i] + 0.0;
-    double b = edge_lengths[b_i] + 0.0;
-    double c = edge_lengths[c_i] + 0.0;
+    double a = edge_lengths[a_i];
+    double b = edge_lengths[b_i];
+    double c = edge_lengths[c_i];
 
-    double tan2 = CGAL::sqrt(CGAL::abs(((a-b+c)*(a+b-c))/((a+b+c)*(-a+b+c))));
+    double num = (a - b + c) * (a + b - c);
+    double divider = (a + b + c) * (-a + b + c);
+    double tan2 = (divider == 0)
+      ? (std::numeric_limits<double>::max)()
+      : CGAL::sqrt(CGAL::abs(((a - b + c) * (a + b - c)) / divider));
+
+    CGAL_warning_msg(divider != 0, "Infinite Cotangent value with degenerate triangle!");
+//  CGAL_warning_msg(false, "Infinite Cotangent value due to floating point arithmetic!");
+
+    std::cout <<  "num = " << num << "\tden = " << divider;
+    if(num == 0 || divider == 0)
+      std::cout << "\t tan2 = " << tan2;
+    std::cout << std::endl;
+
     cotan_weight+=(1-(tan2*tan2))/(2*tan2);
 
     hd = opposite(hd,m_intrinsic_tm);
@@ -261,18 +275,36 @@ private:
     double a = edge_lengths[i];
     double b1 = edge_lengths[b_i];
     double c1 = edge_lengths[c_i];
-    double tan2a = CGAL::sqrt(CGAL::abs(((c1-a+b1)*(-b1+a+c1))/((a+b1+c1)*(b1+a-c1))));
+
+    double divider2a = ((a + b1 + c1) * (b1 + a - c1));
+    double tan2a = (divider2a == 0)
+      ? (std::numeric_limits<double>::max())
+      : CGAL::sqrt(CGAL::abs(((c1-a+b1)*(-b1+a+c1))/divider2a));
     hd = opposite(hd,m_intrinsic_tm);
     hd2 =next(hd,m_intrinsic_tm);
     hd3 = next(hd2,m_intrinsic_tm);
     b_i = get(edge_id_map, edge(hd2,m_intrinsic_tm));
     c_i = get(edge_id_map, edge(hd3,m_intrinsic_tm));
+
     double b2 = edge_lengths[b_i];
     double c2 = edge_lengths[c_i];
-    double tan2d = CGAL::sqrt(CGAL::abs(((-a+b2+c2)*(a+b2-c2))/((a+b2+c2)*(a-b2+c2))));
-    double tan2ad = (tan2a + tan2d)/(1-tan2a*tan2d);
+
+    double divider2d = ((a + b2 + c2) * (a - b2 + c2));
+    double tan2d = (divider2d == 0)
+      ? (std::numeric_limits<double>::max())
+      : CGAL::sqrt(CGAL::abs(((-a+b2+c2)*(a+b2-c2)) / divider2d));
+
+    double tan2ad = (divider2a == 0 || divider2d == 0)
+      ? 1.
+      : (tan2a + tan2d)/(1-tan2a*tan2d);
     double cosad = (1-tan2ad*tan2ad)/(1+tan2ad*tan2ad);
     double new_length = CGAL::sqrt( CGAL::abs(b1*b1 + c2*c2 - 2*b1*c2*cosad));
+
+    if(std::isnan(new_length))
+      std::cout << "new length = " << new_length << std::endl;
+    else
+      std::cout << "new length = " << new_length << std::endl;
+
     edge_lengths[i] = new_length;
   }
 
