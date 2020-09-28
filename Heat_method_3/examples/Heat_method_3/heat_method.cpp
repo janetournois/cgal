@@ -16,7 +16,7 @@ typedef Triangle_mesh::Property_map<vertex_descriptor,double> Vertex_distance_ma
 int main(int argc, char* argv[])
 {
   Triangle_mesh tm;
-  const char* filename = (argc > 1) ? argv[1] : "./data/elephant.off";
+  const char* filename = (argc > 1) ? argv[1] : "./data/toy2.off";
   std::ifstream input(filename);
   if (!input || !(input >> tm) || tm.is_empty()) {
     std::cerr << "Not a valid off file." << std::endl;

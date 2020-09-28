@@ -51,6 +51,9 @@ include_directories( BEFORE include )
 
 include( CGAL_CreateSingleSourceCGALProgram )
 
+create_single_source_cgal_program( "heat_method_bug.cpp" )
+target_link_libraries(heat_method_bug PUBLIC CGAL::Eigen_support)
+
 create_single_source_cgal_program( "heat_method.cpp" )
 target_link_libraries(heat_method PUBLIC CGAL::Eigen_support)
 create_single_source_cgal_program( "heat_method_polyhedron.cpp" )
