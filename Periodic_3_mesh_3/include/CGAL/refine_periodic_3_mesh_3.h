@@ -250,6 +250,30 @@ void refine_periodic_3_mesh_3_impl(C3T3& c3t3,
   CGAL_expensive_postcondition(c3t3.triangulation().is_valid());
   CGAL_expensive_postcondition(c3t3.is_valid());
 
+  for (typename C3T3::Triangulation::Finite_vertices_iterator v = c3t3.triangulation().finite_vertices_begin();
+    v != c3t3.triangulation().finite_vertices_end();
+    ++v)
+  {
+    if (v->in_dimension() == 3)
+    {
+      std::vector<typename C3T3::Cell_handle> cells;
+      c3t3.triangulation().incident_cells(v, std::back_inserter(cells));
+      bool has_one_incident_cell_in_complex = false;
+      for (typename C3T3::Cell_handle c : cells)
+      {
+        if(c3t3.is_in_complex(c))
+          has_one_incident_cell_in_complex = true;
+        else if(has_one_incident_cell_in_complex)
+        {
+          std::cout << "c not in complex : abort()" << std::endl;
+          abort();
+        }
+      }
+    }
+  }
+  std::cout << "In complex test passed : return" << std::endl;
+  return;
+
   // Odt
   if(odt)
   {

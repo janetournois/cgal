@@ -49,12 +49,13 @@ int main(int argc, char* argv[])
                          cell_radius_edge_ratio=3, cell_size=8);
 
   /// [Meshing]
-  C3t3 c3t3 = CGAL::make_mesh_3<C3t3>(domain, criteria);
+  C3t3 c3t3 = CGAL::make_mesh_3<C3t3>(domain, criteria, no_perturb(), no_exude());
   /// [Meshing]
 
-  // Output
-  std::ofstream medit_file("out.mesh");
-  c3t3.output_to_medit(medit_file);
+
+  CGAL::lloyd_optimize_mesh_3(c3t3, domain);
+  CGAL::perturb_mesh_3(c3t3, domain);
+  CGAL::exude_mesh_3(c3t3);
 
   return 0;
 }

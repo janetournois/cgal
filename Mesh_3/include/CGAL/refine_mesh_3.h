@@ -561,6 +561,30 @@ void refine_mesh_3_impl(C3T3& c3t3,
 
   dump_c3t3(c3t3, mesh_options.dump_after_refine_prefix);
 
+  for (typename C3T3::Triangulation::Finite_vertices_iterator
+       v = c3t3.triangulation().finite_vertices_begin();
+       v != c3t3.triangulation().finite_vertices_end();
+       ++v)
+  {
+    if (v->in_dimension() == 3)
+    {
+      std::vector<typename C3T3::Cell_handle> cells;
+      c3t3.triangulation().incident_cells(v, std::back_inserter(cells));
+      bool has_one_incident_cell_in_complex = false;
+      bool has_one_incident_cell_not_in_complex = false;
+      for (typename C3t3::Cell_handle c : cells)
+      {
+        if (c3t3.is_in_complex(c))
+          has_one_incident_cell_in_complex = true;
+        else
+          has_one_incident_cell_not_in_complex = true;
+      }
+      // either all in or all out
+      assert(has_one_incident_cell_in_complex != has_one_incident_cell_not_in_complex);
+    }
+  }
+  std::cout << "Refinement OK" << std::endl;
+
   // Odt
   if ( odt )
   {
