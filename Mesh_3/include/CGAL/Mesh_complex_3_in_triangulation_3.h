@@ -47,8 +47,8 @@ namespace CGAL {
 
 
 template <typename Tr,
-          typename CornerIndex = int,
-          typename CurveIndex = int>
+          typename CornerIndex,
+          typename CurveIndex>
 class Mesh_complex_3_in_triangulation_3 :
   public Mesh_3::Mesh_complex_3_in_triangulation_3_base<
     Tr, typename Tr::Concurrency_tag>
