@@ -68,7 +68,6 @@ public:
             Remeshing_Vb, Remeshing_Cb, Concurrency_tag>  Tds;
   typedef CGAL::Triangulation_3<Gt, Tds>                  Base;
 
-  using Base::Base;
 };
 
 }//end namespace Tetrahedral_remeshing

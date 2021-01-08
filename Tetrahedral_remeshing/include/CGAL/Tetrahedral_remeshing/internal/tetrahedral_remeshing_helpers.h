@@ -956,9 +956,7 @@ Subdomain_relation compare_subdomains(const typename C3t3::Vertex_handle v0,
                                       const C3t3& c3t3)
 {
   typedef typename C3t3::Subdomain_index Subdomain_index;
-  typedef boost::container::flat_set<Subdomain_index,
-    std::less<Subdomain_index>,
-    boost::container::small_vector<Subdomain_index, 30> > Set_of_subdomains;
+  typedef boost::container::flat_set<Subdomain_index> Set_of_subdomains;
 
   Set_of_subdomains subdomains_v0;
   incident_subdomains(v0, c3t3,
