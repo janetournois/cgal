@@ -33,7 +33,8 @@ int main(int argc, char* argv[])
   }
 
 
-  Remeshing_triangulation tr(points.begin(), points.end());
+  Remeshing_triangulation tr;
+  tr.insert(points.begin(), points.end());
   for(Remeshing_triangulation::Finite_cells_iterator c = tr.finite_cells_begin();
        c != tr.finite_cells_end();
        ++c)
