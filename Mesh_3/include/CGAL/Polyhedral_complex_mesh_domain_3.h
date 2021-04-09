@@ -475,33 +475,25 @@ public:
     {
       CGAL_assertion(several_vertices_on_patch[patch_id].size()
                      <= nb_of_extra_vertices_per_patch);
-      if (this->patch_has_featured_edges.test(patch_id)) {
-        if (!several_vertices_on_patch[patch_id].empty()) {
+      if (this->patch_has_featured_edges.test(patch_id))
+      {
+        if (!several_vertices_on_patch[patch_id].empty())
+        {
           Vertex_const_handle v =
             several_vertices_on_patch[patch_id].front();
-          typename Tr::Vertex_handle tr_v = tr.nearest_power_vertex(v->point());
-          FT sq_dist_v = CGAL::squared_distance(v->point(),
-            tr_v->point().point());
+
           for (std::size_t i = 1,
-            size = several_vertices_on_patch[patch_id].size();
-            i < size; ++i)
+               size = several_vertices_on_patch[patch_id].size();
+               i < size; ++i)
           {
-            Vertex_const_handle other_v =
-              several_vertices_on_patch[patch_id][i];
-            tr_v = tr.nearest_power_vertex(other_v->point());
-            const FT sq_dist_other_v =
-              CGAL::squared_distance(other_v->point(),
-              tr_v->point().point());
-            if (sq_dist_other_v > sq_dist_v) {
-              v = other_v;
-              sq_dist_v = sq_dist_other_v;
-            }
+            v = several_vertices_on_patch[patch_id][i];
+            typename Tr::Vertex_handle tr_v = tr.insert(cwp(v->point()));
+            c3t3.set_dimension(tr_v, 2);
+            c3t3.set_index(tr_v, patch_id);
           }
-          tr_v = tr.insert(cwp(v->point()));
-          c3t3.set_dimension(tr_v, 2);
-          c3t3.set_index(tr_v, patch_id);
-        } // end if several_vertices_on_patch is empty for patch_id
-      } // end if patch has featured edges
+        }
+      } // end if several_vertices_on_patch is empty for patch_id
+       // end if patch has featured edges
       else { // the patch is closed
         BOOST_FOREACH(Vertex_const_handle v,
           several_vertices_on_patch[patch_id])
@@ -512,8 +504,23 @@ public:
         }
       }
     }
+
+    for (typename Tr::Finite_cells_iterator ch = tr.finite_cells_begin();
+         ch != tr.finite_cells_end(); ++ch)
+    {
+      const Subdomain subdomain =
+        this->is_in_domain_object()(c3t3.triangulation().dual(ch));
+        // function dual(cell) updates the circumcenter cache if there is one
+      if (subdomain)
+        c3t3.add_to_complex(ch, *subdomain);
+      else
+        c3t3.remove_from_complex(ch);
+    }
+
 #ifdef CGAL_MESH_3_VERBOSE
-    std::cout << "\badd_vertices_to_c3t3_on_patch_without_feature_edges done.";
+    std::cout << "\radd_vertices_to_c3t3_on_patch_without_feature_edges done "
+      << "(nbv = " << c3t3.triangulation().number_of_vertices() <<","
+      << " cells = "<< c3t3.number_of_cells() <<").";
     std::cout << std::endl;
 #endif
   }
