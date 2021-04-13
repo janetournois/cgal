@@ -74,6 +74,47 @@ public:
     else
       return boost::none;
   }
+  
+  boost::optional<FT> is_protected_constraint_too_long(const vertex_descriptor& va,
+                                                     const vertex_descriptor& vb) const
+  {
+    const FT sqlen = 4./3.* sqlength(va, vb);
+    if (sqlen > m_sq_long)
+      return sqlen;
+    else
+        return boost::none;
+  }
+  
+  boost::optional<FT> is_too_short(const halfedge_descriptor& h) const
+  {
+    const FT sqlen = sqlength(h);
+    if (sqlen < m_sq_long)
+      return sqlen;
+    else
+      return boost::none;
+  }
+
+
+  boost::optional<FT> is_too_short(const halfedge_descriptor& h) const
+  {
+    const FT sqlen = sqlength(h);
+    if (sqlen < m_sq_long)
+      return sqlen;
+    else
+      return boost::none;
+  }
+
+
+
+  boost::optional<FT> is_too_short(const halfedge_descriptor& h) const
+  {
+    const FT sqlen = sqlength(h);
+    if (sqlen < m_sq_long)
+      return sqlen;
+    else
+      return boost::none;
+  }
+
 
   boost::optional<FT> is_too_short(const halfedge_descriptor& h) const
   {
