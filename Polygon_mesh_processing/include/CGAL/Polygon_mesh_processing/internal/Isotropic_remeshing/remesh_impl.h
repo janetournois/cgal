@@ -248,7 +248,7 @@ namespace internal {
             get(ecmap, e) ||
             get(fpm, face(h,pmesh))!=get(fpm, face(opposite(h,pmesh),pmesh)) )
       {
-        if (sizing.is_too_long(source(h, pmesh), target(h, pmesh)))
+        if (sizing.is_protected_constraint_too_long(source(h, pmesh), target(h, pmesh)))
         {
           return false;
         }
