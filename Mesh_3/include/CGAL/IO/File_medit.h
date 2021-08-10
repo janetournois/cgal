@@ -779,9 +779,7 @@ output_to_medit(std::ostream& os,
 
   boost::unordered_map<Vertex_handle, int> V;
   int inum = 1;
-  for( Finite_vertices_iterator vit = tr.finite_vertices_begin();
-       vit != tr.finite_vertices_end();
-       ++vit)
+  for( auto vit : c3t3.triangulation().finite_vertex_handles() )
   {
     V[vit] = inum++;
     Point p = tr.point(vit);
@@ -841,11 +839,9 @@ output_to_medit(std::ostream& os,
   // Tetrahedra
   //-------------------------------------------------------
   os << "Tetrahedra\n"
-     << c3t3.number_of_cells_in_complex() << '\n';
+     << c3t3.triangulation().number_of_finite_cells() << '\n';
 
-  for( Cell_iterator cit = c3t3.cells_in_complex_begin() ;
-       cit != c3t3.cells_in_complex_end() ;
-       ++cit )
+  for( auto cit : c3t3.triangulation().finite_cell_handles())
   {
     for (int i=0; i<4; i++)
       os << V[cit->vertex(i)] << ' ';
