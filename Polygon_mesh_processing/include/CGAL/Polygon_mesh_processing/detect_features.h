@@ -325,7 +325,7 @@ template <typename PolygonMesh, typename FT,
 #else
 template <typename PolygonMesh, typename EdgeIsFeatureMap, typename NamedParameters>
 #endif
-void detect_sharp_edges(PolygonMesh& pmesh,
+void detect_sharp_edges(const PolygonMesh& pmesh,
 #ifdef DOXYGEN_RUNNING
     const FT& angle_in_deg,
 #else
@@ -362,7 +362,7 @@ void detect_sharp_corners(const PolygonMesh& pmesh,
 {
   using parameters::choose_parameter;
   using parameters::get_parameter;
-  using edge_descriptor = boost::graph_traits<PolygonMesh>::edge_descriptor;
+  using edge_descriptor = typename boost::graph_traits<PolygonMesh>::edge_descriptor;
 
   typedef typename GetVertexPointMap<PolygonMesh, NamedParameters>::const_type VPMap;
   VPMap vpmap = choose_parameter(get_parameter(np, internal_np::vertex_point),
@@ -376,7 +376,7 @@ void detect_sharp_corners(const PolygonMesh& pmesh,
   EFMap eif = choose_parameter(get_parameter(np, CGAL::edge_is_feature),
                                Static_boolean_property_map<edge_descriptor, false>());
 
-  PMP::detect_sharp_edges(pmesh, 60, eif);
+  detect_sharp_edges(pmesh, 60, eif, parameters::all_default());
 //
 //  using ECMap = typename internal_np::Lookup_named_param_def <
 //    internal_np::edge_is_constrained_t,
