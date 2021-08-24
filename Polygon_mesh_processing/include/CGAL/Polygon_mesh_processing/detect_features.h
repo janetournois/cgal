@@ -360,7 +360,39 @@ void detect_sharp_corners(const PolygonMesh& pmesh,
     VertexIsFeatureMap vertex_is_feature_map,
     const NamedParameters& np)
 {
-  internal::sharp_corner_call(pmesh, angle_in_deg, vertex_is_feature_map, np);
+  using parameters::choose_parameter;
+  using parameters::get_parameter;
+  using edge_descriptor = boost::graph_traits<PolygonMesh>::edge_descriptor;
+
+  typedef typename GetVertexPointMap<PolygonMesh, NamedParameters>::const_type VPMap;
+  VPMap vpmap = choose_parameter(get_parameter(np, internal_np::vertex_point),
+                                 get_const_property_map(vertex_point, pmesh));
+
+  typedef typename internal_np::Lookup_named_param_def <
+    CGAL::edge_is_feature_t,
+    NamedParameters,
+    Static_boolean_property_map<edge_descriptor, false> // default (no constraint pmap)
+  > ::type EFMap;
+  EFMap eif = choose_parameter(get_parameter(np, CGAL::edge_is_feature),
+                               Static_boolean_property_map<edge_descriptor, false>());
+
+  PMP::detect_sharp_edges(pmesh, 60, eif);
+//
+//  using ECMap = typename internal_np::Lookup_named_param_def <
+//    internal_np::edge_is_constrained_t,
+//    NamedParameters,
+//    Static_boolean_property_map<edge_descriptor, false> // default (no constraint pmap)
+//  > ::type;
+//  ECMap eif = choose_parameter(get_parameter(np, internal_np::edge_is_constrained),
+//                               Static_boolean_property_map<edge_descriptor, false>());
+
+//  typedef typename boost::property_map<PolygonMesh, CGAL::edge_is_feature_t>::type EIFMap;
+//  EIFMap eif = get(CGAL::edge_is_feature, pmesh);
+//  PMP::detect_sharp_edges(pmesh, angle_in_deg, eif);// , np);
+
+//  internal::sharp_corner_call(pmesh, angle_in_deg, vertex_is_feature_map, vpm, eif);
+
+//  internal::sharp_corner_call(pmesh, angle_in_deg, vertex_is_feature_map, np);
 }
 
 
