@@ -1195,8 +1195,10 @@ void dump_polylines(const CellRange& cells, const char* filename)
 template<typename C3t3>
 void check_surface_patch_indices(const C3t3& c3t3)
 {
-  typedef typename C3t3::Vertex_handle Vertex_handle;
-  for (Vertex_handle v : c3t3.triangulation().finite_vertex_handles())
+  for (typename C3t3::Triangulation::Finite_vertices_iterator
+       v = c3t3.triangulation().finite_vertices_begin();
+       v != c3t3.triangulation().finite_vertices_end();
+       ++v)
   {
     if (v->in_dimension() != 2)
       continue;

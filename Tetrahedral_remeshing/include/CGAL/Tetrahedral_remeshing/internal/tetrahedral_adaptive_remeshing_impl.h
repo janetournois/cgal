@@ -575,8 +575,11 @@ private:
   }
   void debug_c3t3()
   {
-    for (typename Tr::Facet f : tr().finite_facets())
+    for (typename Tr::Finite_facets_iterator fit = tr().finite_facets_begin();
+        fit != tr().finite_facets_end();
+        ++fit)
     {
+      typename Tr::Facet f = *fit;
       typename Tr::Facet mf = tr().mirror_facet(f);
       CGAL_assertion(m_c3t3.is_in_complex(f) == m_c3t3.is_in_complex(mf));
     }
