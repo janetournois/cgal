@@ -51,10 +51,10 @@ public:
   /**
    * @brief Constructor
    */
-  template < typename Sizing_field, typename SizingBound, typename Sizing_field2 >
+  template < typename Sizing_field, typename Sizing_lower_bound, typename Sizing_field2 >
   Mesh_facet_criteria_3(const FT& angle_bound,
                         const Sizing_field& radius_bound,
-                        const SizingBound& radius_lower_bound,
+                        const Sizing_lower_bound& radius_lower_bound,
                         const Sizing_field2& distance_bound,
                         const Mesh_facet_topology topology =
                           FACET_VERTICES_ON_SURFACE)
@@ -108,8 +108,10 @@ private:
     criteria_.add(new Uniform_size_criterion(radius_bound));
   }
 
-  template <typename Sizing_field>
-  void init_radius(const Sizing_field& radius_bound, const FT& lower_bound, Tag_true)
+  template <typename Sizing_field, typename Sizing_lower_bound>
+  void init_radius(const Sizing_field& radius_bound,
+                   const Sizing_lower_bound& lower_bound,
+                   Tag_true)
   {
     typedef Mesh_3::Variable_size_criterion<Tr,Visitor,Sizing_field> Variable_size_criterion;
     criteria_.add(new Variable_size_criterion(radius_bound));

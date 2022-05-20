@@ -46,7 +46,9 @@ int main(int argc, char* argv[])
 
   // Mesh criteria
   Mesh_criteria criteria(facet_angle=30, facet_size=6, facet_distance=4,
-                         cell_radius_edge_ratio=3, cell_size=8);
+                         facet_minimal_size = 2,
+                         cell_radius_edge_ratio=3, cell_size=8,
+                         cell_minimal_size = 2);
 
   /// [Meshing]
   C3t3 c3t3 = CGAL::make_mesh_3<C3t3>(domain, criteria);

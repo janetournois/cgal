@@ -328,7 +328,10 @@ private:
 public:
   // Nb: the default bound of the criterion is such that the criterion
   // is always fulfilled
-  Variable_size_criterion(const Sizing_field& s) : size_(s) {}
+  Variable_size_criterion(const Sizing_field& s, const FT& minimal_size)
+  : size_(s)
+  , sq_minimal_size_(minimal_size*minimal_size)
+   {}
 
 protected:
   virtual void do_accept(Visitor_& v) const
@@ -375,6 +378,7 @@ protected:
 
 private:
   Sizing_field size_;
+  FT sq_minimal_size_;
 
 };  // end Variable_size_criterion
 
@@ -398,7 +402,10 @@ private:
 public:
   // Nb: the default bound of the criterion is such that the criterion
   // is always fulfilled
-  Uniform_size_criterion(const FT b = 1e20) : B_(b * b) {}
+  Uniform_size_criterion(const FT b = 1e20, const FT minimal_size = 0)
+   : B_(b * b)
+   , sq_minimal_size_(minimal_size*minimal_size)
+   {}
 
 protected:
   virtual void do_accept(Visitor_& v) const
@@ -443,6 +450,7 @@ protected:
 
 private:
   FT B_;
+  FT sq_minimal_size_;
 
 };  // end Uniform_size_criterion
 

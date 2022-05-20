@@ -142,8 +142,10 @@ class Cell_uniform_size_criterion
 
 public:
   // Constructor
-  Cell_uniform_size_criterion(const FT& radius_bound)
-    : sq_radius_bound_(radius_bound*radius_bound)   {}
+  Cell_uniform_size_criterion(const FT& radius_bound, const FT& minimal_radius)
+    : sq_radius_bound_(radius_bound*radius_bound)
+    , sq_minimal_radius_(minimal_radius*minimal_radius)
+  {}
 
   // Destructor
   ~Cell_uniform_size_criterion() {}
@@ -196,6 +198,7 @@ protected:
 
 private:
   FT sq_radius_bound_;
+  FT sq_minimal_radius_;
 
 };  // end class Cell_uniform_size_criterion
 
@@ -217,8 +220,10 @@ class Cell_variable_size_criterion
 
 public:
   // Constructor
-  Cell_variable_size_criterion(const Sizing_field& s)
-    : size_(s)   {}
+  Cell_variable_size_criterion(const Sizing_field& s, const FT& minimal_size)
+    : size_(s)
+    , minimal_size_(minimal_size)
+  {}
 
   // Destructor
   ~Cell_variable_size_criterion() {}
@@ -273,6 +278,7 @@ protected:
 
 private:
   Sizing_field size_;
+  const FT minimal_size_;
 
 };  // end class Cell_variable_size_criterion
 
