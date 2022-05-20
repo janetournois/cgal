@@ -104,15 +104,15 @@ public:
                       args[parameters::facet_size
                            | args[parameters::facet_sizing_field
                                   | args[parameters::sizing_field | FT(0)] ] ],
-                      args[parameters::facet_minimal_size | FT(0)],
                       args[parameters::facet_distance | FT(0)],
-                      args[parameters::facet_topology | CGAL::FACET_VERTICES_ON_SURFACE])
+                      args[parameters::facet_topology | CGAL::FACET_VERTICES_ON_SURFACE],
+                      args[parameters::facet_minimal_size | FT(0)])
     , cell_criteria_(args[parameters::cell_radius_edge_ratio
                           | args[parameters::cell_radius_edge | FT(0)] ],
                      args[parameters::cell_size
                           | args[parameters::cell_sizing_field
                                  | args[parameters::sizing_field | FT(0)] ] ],
-                     args[parameters::facet_minimal_size | FT(0)])
+                     args[parameters::cell_minimal_size | FT(0)])
   { }
 
 #ifndef CGAL_NO_DEPRECATED_CODE

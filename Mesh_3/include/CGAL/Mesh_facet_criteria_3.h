@@ -51,13 +51,12 @@ public:
   /**
    * @brief Constructor
    */
-  template < typename Sizing_field, typename Sizing_lower_bound, typename Sizing_field2 >
+  template <typename Sizing_field, typename Sizing_field2, typename Sizing_lower_bound>
   Mesh_facet_criteria_3(const FT& angle_bound,
                         const Sizing_field& radius_bound,
-                        const Sizing_lower_bound& radius_lower_bound,
                         const Sizing_field2& distance_bound,
-                        const Mesh_facet_topology topology =
-                          FACET_VERTICES_ON_SURFACE)
+                        const Mesh_facet_topology topology = FACET_VERTICES_ON_SURFACE,
+                        const Sizing_lower_bound radius_lower_bound = 0.)
   {
     if ( FT(0) != angle_bound )
       init_aspect(angle_bound);
