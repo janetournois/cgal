@@ -28,7 +28,7 @@
 namespace CGAL {
 
 template<typename Tr,
-         typename Visitor_ = Mesh_3::Facet_criterion_visitor_with_features<Tr> >
+         typename Visitor_ = Mesh_3::Facet_criterion_visitor_with_radius_lower_bound<Tr> >
 class Mesh_facet_criteria_3
 {
 public:
@@ -51,18 +51,20 @@ public:
   /**
    * @brief Constructor
    */
-  template <typename Sizing_field, typename Sizing_field2, typename Sizing_lower_bound>
+  template <typename Sizing_field, typename Sizing_field2>
   Mesh_facet_criteria_3(const FT& angle_bound,
                         const Sizing_field& radius_bound,
                         const Sizing_field2& distance_bound,
                         const Mesh_facet_topology topology = FACET_VERTICES_ON_SURFACE,
-                        const Sizing_lower_bound radius_lower_bound = 0.)
+                        const FT radius_lower_bound = 0.)
   {
     if ( FT(0) != angle_bound )
       init_aspect(angle_bound);
 
+    if (FT(0) != radius_lower_bound)
+      init_lower_bound_radius(radius_lower_bound);
+
     init_radius(radius_bound,
-                radius_lower_bound,
                 Mesh_3::Is_mesh_domain_field_3<Tr, Sizing_field>());
 
     init_distance(distance_bound,
@@ -100,20 +102,25 @@ private:
     criteria_.add(new Aspect_criterion(angle_bound));
   }
 
-  void init_radius(const FT& radius_bound, const FT& lower_bound,  Tag_false)
+  void init_radius(const FT& radius_bound, Tag_false)
   {
     if(FT(0) == radius_bound) return;
     typedef Mesh_3::Uniform_size_criterion<Tr,Visitor> Uniform_size_criterion;
     criteria_.add(new Uniform_size_criterion(radius_bound));
   }
 
-  template <typename Sizing_field, typename Sizing_lower_bound>
-  void init_radius(const Sizing_field& radius_bound,
-                   const Sizing_lower_bound& lower_bound,
-                   Tag_true)
+  template <typename Sizing_field>
+  void init_radius(const Sizing_field& radius_bound, Tag_true)
   {
     typedef Mesh_3::Variable_size_criterion<Tr,Visitor,Sizing_field> Variable_size_criterion;
     criteria_.add(new Variable_size_criterion(radius_bound));
+  }
+
+  void init_lower_bound_radius(const FT& radius_lower_bound)
+  {
+    using V = Mesh_3::Facet_criterion_visitor_with_radius_lower_bound<Tr>;
+    using Radius_criterion = Mesh_3::Uniform_size_criterion<Tr, V>;
+    criteria_.add(new Radius_criterion(radius_lower_bound, true));
   }
 
   void init_distance(const FT& distance_bound, Tag_false)

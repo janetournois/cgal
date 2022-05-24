@@ -28,7 +28,7 @@
 namespace CGAL {
 
 template <typename Tr,
-          typename Visitor_ = Mesh_3::Cell_criteria_visitor_with_features<Tr> >
+          typename Visitor_ = Mesh_3::Cell_criterion_visitor_with_radius_lower_bound<Tr> >
 class Mesh_cell_criteria_3
 {
 public:
@@ -58,8 +58,11 @@ public:
                        const FT& radius_bound,
                        const FT& radius_lower_bound = 0.)
   {
+    if ( FT(0) != radius_lower_bound)
+      init_lower_bound_radius(radius_lower_bound);
+
     if ( FT(0) != radius_bound )
-      init_radius(radius_bound, radius_lower_bound);
+      init_radius(radius_bound);
 
     if ( FT(0) != radius_edge_bound )
       init_radius_edge(radius_edge_bound);
@@ -75,6 +78,9 @@ public:
                          Mesh_3::Is_mesh_domain_field_3<Tr, Sizing_field>::value
                          >::type* = 0)
   {
+    if (FT(0) != radius_lower_bound)
+      init_lower_bound_radius(radius_lower_bound);
+
     init_radius(radius_bound, radius_lower_bound);
 
     if ( FT(0) != radius_edge_bound )
@@ -106,19 +112,26 @@ private:
     criteria_.add(new Radius_edge_criterion(radius_edge_bound));
   }
 
-  void init_radius(const FT& radius_bound, const FT& radius_lower_bound)
+  void init_radius(const FT& radius_bound)
   {
     typedef Mesh_3::Cell_uniform_size_criterion<Tr,Visitor> Radius_criterion;
-    criteria_.add(new Radius_criterion(radius_bound, radius_lower_bound));
+    criteria_.add(new Radius_criterion(radius_bound));
   }
 
   template < typename Sizing_field>
-  void init_radius(const Sizing_field& radius_bound, const FT& radius_lower_bound)
+  void init_radius(const Sizing_field& radius_bound)
   {
     typedef Mesh_3::Cell_variable_size_criterion<Tr,Visitor,Sizing_field>
       Radius_criterion;
+    criteria_.add(new Radius_criterion(radius_bound));
+  }
 
-    criteria_.add(new Radius_criterion(radius_bound, radius_lower_bound));
+  void init_lower_bound_radius(const FT& radius_lower_bound)
+  {
+    using Radius_criterion
+      = Mesh_3::Cell_uniform_size_criterion<Tr, Visitor>;
+    criteria_.add(new Radius_criterion(radius_lower_bound,
+                                       true/*is_lower_bound*/));
   }
 
 private:
