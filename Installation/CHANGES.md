@@ -21,7 +21,15 @@ CGAL tetrahedral Delaunay refinement algorithm.
 
 -   This new package wraps all the existing code that deals with a `MeshComplex_3InTriangulation_3` to describe 3D simplicial meshes, and makes the data structure independent from the tetrahedral mesh generation package.
 
+### [Tetrahedral Mesh Generation](https://doc.cgal.org/5.6/Manual/packages.html#PkgMesh3)
+
+- Added a mesh domain named constructor `CGAL::create_labeled_image_mesh_domain_with_features()`
+for automatic detection and protection
+of 1D-curves that lie at the intersection of three or more subdomains,
+extracted from labeled images.
+
 ### [2D Arrangements](https://doc.cgal.org/5.6/Manual/packages.html#PkgArrangementOnSurface2)
+
 -   Fixed some code that handles geodesic-curves on spheres that compare x- and y-coordinates on the boundary of the parameter space. It mainly effected the naive point-location.
 
 ### [2D Convex Hulls](https://doc.cgal.org/5.6/Manual/packages.html#PkgConvexHull2)
@@ -39,7 +47,8 @@ CGAL tetrahedral Delaunay refinement algorithm.
 ### [2D Conforming Triangulations and Meshes](https://doc.cgal.org/5.6/Manual/packages.html#PkgMesh2)
 
 -   Deprecated two overloads of Function `refine_Delaunay_mesh()` and replaced them with versions using function named parameters.
--   Add overloads of function `write_VTU()` with property maps for specifying the domain.    
+-   Add overloads of function `write_VTU()` with property maps for specifying the domain.
+
 
 [Release 5.5](https://github.com/CGAL/cgal/releases/tag/v5.5)
 -----------

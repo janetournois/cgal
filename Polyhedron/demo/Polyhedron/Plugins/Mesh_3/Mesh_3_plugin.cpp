@@ -277,12 +277,16 @@ void Mesh_3_plugin::mesh_3_volume()
   mesh_3(Mesh_type::VOLUME);
 }
 
-boost::optional<QString> Mesh_3_plugin::get_items_or_return_error_string() const {
+boost::optional<QString> Mesh_3_plugin::get_items_or_return_error_string() const
+{
   using boost::get;
   items = {};
   features_protection_available = false;
   item = nullptr;
-  for (int ind : scene->selectionIndices()) {
+  Scene_polylines_item* polylines_item = nullptr;
+
+  for (int ind : scene->selectionIndices())
+  {
     try {
       if (auto sm_item =
               qobject_cast<Scene_surface_mesh_item*>(scene->item(ind))) {
@@ -313,9 +317,11 @@ boost::optional<QString> Mesh_3_plugin::get_items_or_return_error_string() const
           return tr("An image items cannot be mixed with other items type");
       }
 #  endif
-      else if (auto polylines_item =
-                   qobject_cast<Scene_polylines_item*>(scene->item(ind))) {
-        if (!items) items = Polyhedral_mesh_items{};
+      else if ((polylines_item =
+                qobject_cast<Scene_polylines_item*>(scene->item(ind))))
+      {
+        if (!items)
+          continue;
         auto poly_items_ptr = get<Polyhedral_mesh_items>(&*items);
         if(poly_items_ptr) {
           if (poly_items_ptr->polylines_item) {
@@ -323,12 +329,16 @@ boost::optional<QString> Mesh_3_plugin::get_items_or_return_error_string() const
           } else {
             poly_items_ptr->polylines_item = polylines_item;
           }
-        } else {
-          auto image_items = get<Image_mesh_items>(*items);
-          if (image_items.polylines_item) {
-            return tr("Only one polyline item is accepted");
-          } else {
-            image_items.polylines_item = polylines_item;
+        }
+        else {
+          if(auto image_items_ptr = get<Image_mesh_items>(&*items))
+          {
+            if (image_items_ptr->polylines_item) {
+              return tr("Only one polyline item is accepted");
+            }
+            else {
+              image_items_ptr->polylines_item = polylines_item;
+            }
           }
         }
       }
@@ -341,6 +351,20 @@ boost::optional<QString> Mesh_3_plugin::get_items_or_return_error_string() const
       }
     } catch (const boost::bad_get&) { return tr("Wrong selection of items"); }
   } // end for loop on selected items
+
+  //attach polylines_item to one or the other item
+  //if it could not be done in the for loop
+  //because of selection order
+  if (polylines_item != nullptr && items != boost::none)
+  {
+    auto poly_items_ptr = get<Polyhedral_mesh_items>(&*items);
+    auto image_items_ptr = get<Image_mesh_items>(&*items);
+    if(poly_items_ptr && poly_items_ptr == nullptr)
+      poly_items_ptr->polylines_item = polylines_item;
+    else if(image_items_ptr && image_items_ptr == nullptr)
+      image_items_ptr->polylines_item = polylines_item;
+  }
+
   if (!items) { return tr("Selected objects can't be meshed"); }
   item = nullptr;
   features_protection_available = false;
@@ -599,6 +623,7 @@ void Mesh_3_plugin::mesh_3(const Mesh_type mesh_type,
         ui.protectEdges->addItem(QString("Input polylines"));
       else {
         ui.protectEdges->addItem(QString("Polylines on cube"));
+        ui.protectEdges->addItem(QString("Triple+ lines detected"));
       }
     }
   }
@@ -608,9 +633,11 @@ void Mesh_3_plugin::mesh_3(const Mesh_type mesh_type,
           ui.weightsSigma, SLOT(setEnabled(bool)));
   connect(ui.useWeights_checkbox, SIGNAL(toggled(bool)),
           ui.weightsSigma_label, SLOT(setEnabled(bool)));
-  ui.weightsSigma->setValue(1.);
   bool input_is_labeled_img = (image_item != nullptr && !image_item->isGray());
   ui.labeledImgGroup->setVisible(input_is_labeled_img);
+  ui.weightsSigma->setValue((std::max)(image_item->image()->vx(),
+                            (std::max)(image_item->image()->vy(),
+                                       image_item->image()->vz())));
 
 #ifndef CGAL_USE_ITK
   if (input_is_labeled_img)
@@ -646,9 +673,9 @@ void Mesh_3_plugin::mesh_3(const Mesh_type mesh_type,
   approx = !ui.noApprox->isChecked() ? 0 : ui.approx->value();
   tets_shape = !ui.noTetShape->isChecked() ? 0 : ui.tetShape->value();
   tets_sizing = !ui.noTetSizing->isChecked() ? 0 : ui.tetSizing->value();
-  protect_features =
-      ui.protect->isChecked() && (ui.protectEdges->currentIndex() == 0);
   protect_borders =
+      ui.protect->isChecked() && (ui.protectEdges->currentIndex() == 0);
+  protect_features =
       ui.protect->isChecked() && (ui.protectEdges->currentIndex() == 1);
   const bool detect_connected_components = ui.detectComponents->isChecked();
   const int manifold = (ui.manifoldCheckBox->isChecked() ? 1 : 0) +
@@ -745,7 +772,7 @@ void Mesh_3_plugin::mesh_3(const Mesh_type mesh_type,
      }
     break;
   }//end case POLYHEDRAL_MESH_ITEMS
-  // Image
+  // Implicit functions
 #  ifdef CGAL_MESH_3_DEMO_ACTIVATE_IMPLICIT_FUNCTIONS
   case IMPLICIT_MESH_ITEMS: {
     const Implicit_function_interface* pFunction = function_item->function();
@@ -764,11 +791,15 @@ void Mesh_3_plugin::mesh_3(const Mesh_type mesh_type,
                               manifold,
                               mesh_type == Mesh_type::SURFACE_ONLY);
     break;
-  }
+  }//end case IMPLICIT_MESH_ITEMS
 #  endif
+  // Images
 #  ifdef CGAL_MESH_3_DEMO_ACTIVATE_SEGMENTED_IMAGES
   case IMAGE_MESH_ITEMS: {
     const Image* pImage = image_item->image();
+    auto& image_items = get<Image_mesh_items>(*items);
+    const auto img_polylines_item = image_items.polylines_item;
+
     if (nullptr == pImage) {
       QMessageBox::critical(mw, tr(""), tr("ERROR: no data in selected item"));
       return;
@@ -777,9 +808,11 @@ void Mesh_3_plugin::mesh_3(const Mesh_type mesh_type,
     if ( sigma_weights > 0
       && sigma_weights != image_item->sigma_weights())
     {
-      image_item->set_image_weights(
-        CGAL::Mesh_3::generate_label_weights(*pImage, sigma_weights),
-        sigma_weights);
+      CGAL::Image_3 weights = CGAL::Mesh_3::generate_label_weights(*pImage, sigma_weights);
+      if (protect_features || protect_borders)
+        CGAL::Mesh_3::postprocess_weights_for_feature_protection(*pImage, weights);
+
+      image_item->set_image_weights(weights, sigma_weights);
     }
 #endif
     const Image* pWeights = sigma_weights > 0
@@ -790,7 +823,7 @@ void Mesh_3_plugin::mesh_3(const Mesh_type mesh_type,
 
     thread = cgal_code_mesh_3(
         pImage,
-        (polylines_item == nullptr) ? plc : polylines_item->polylines,
+        (img_polylines_item == nullptr) ? plc : img_polylines_item->polylines,
         angle,
         facets_sizing,
         approx,
@@ -798,6 +831,7 @@ void Mesh_3_plugin::mesh_3(const Mesh_type mesh_type,
         edges_sizing,
         tets_shape,
         protect_features,
+        protect_borders,
         manifold,
         mesh_type == Mesh_type::SURFACE_ONLY,
         detect_connected_components,

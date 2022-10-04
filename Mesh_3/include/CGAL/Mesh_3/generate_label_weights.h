@@ -21,7 +21,7 @@
 #include <itkImage.h>
 #include <itkImageDuplicator.h>
 #include <itkBinaryThresholdImageFilter.h>
-#include <itkRecursiveGaussianImageFilter.h>
+#include <itkDiscreteGaussianImageFilter.h>
 #include <itkMaximumImageFilter.h>
 
 #include <iostream>
@@ -108,6 +108,39 @@ SIGN get_sign()
 //    SGN_UNKNOWN
 }
 
+template<typename Image_word_type>
+void convert_itk_to_image_3(itk::Image<Image_word_type, 3>* const itk_img,
+                            const char* filename = "")
+{
+  auto t = itk_img->GetOrigin();
+  auto v = itk_img->GetSpacing();
+  auto region = itk_img->GetRequestedRegion();
+
+  _image* img
+    = _createImage(region.GetSize(0), region.GetSize(1), region.GetSize(2),
+      1,                                        //vectorial dimension
+      v[0], v[1], v[2],
+      sizeof(Image_word_type),                     //image word size in bytes
+      internal::get_wordkind<Image_word_type>(),   //image word kind WK_FIXED, WK_FLOAT, WK_UNKNOWN
+      internal::get_sign<Image_word_type>());      //image word sign
+  Image_word_type* img_ptr = (Image_word_type*)(img->data);
+
+  const int size = region.GetSize(0) * region.GetSize(1) * region.GetSize(2);
+  std::fill(img_ptr,
+            img_ptr + size,
+            Image_word_type(0));
+  img->tx = t[0];
+  img->ty = t[1];
+  img->tz = t[2];
+
+  std::copy(itk_img->GetBufferPointer(),
+            itk_img->GetBufferPointer() + size,
+            img_ptr);
+
+  if(filename != "")
+    _writeImage(img, filename);
+}
+
 }//namespace internal
 
 /// @cond INTERNAL
@@ -141,9 +174,14 @@ CGAL::Image_3 generate_label_weights_with_known_word_type(const CGAL::Image_3& i
   std::set<Image_word_type> labels;
   internal::convert_image_3_to_itk(image, itk_img.GetPointer(), labels);
 
+#ifdef CGAL_MESH_3_WEIGHTED_IMAGES_DEBUG
+  CGAL_assertion(internal::count_non_white_pixels<Image_word_type>(image)
+              == internal::count_non_white_pixels<Image_word_type>(itk_img.GetPointer()));
+#endif
+
   using DuplicatorType = itk::ImageDuplicator<ImageType>;
   using IndicatorFilter = itk::BinaryThresholdImageFilter<ImageType, WeightsType>;
-  using GaussianFilterType = itk::RecursiveGaussianImageFilter<WeightsType, WeightsType>;
+  using GaussianFilterType = itk::DiscreteGaussianImageFilter<WeightsType, WeightsType>;
   using MaximumImageFilterType = itk::MaximumImageFilter<WeightsType>;
 
   std::vector<typename ImageType::Pointer> indicators(labels.size());
@@ -178,11 +216,26 @@ CGAL::Image_3 generate_label_weights_with_known_word_type(const CGAL::Image_3& i
     indicator->SetUpperThreshold(label);
     indicator->Update();
 
+#ifdef CGAL_MESH_3_WEIGHTED_IMAGES_DEBUG
+    std::ostringstream oss;
+    oss << "indicator_" << id << ".inr.gz";
+    std::cout << "filename = " << oss.str().c_str() << std::endl;
+    internal::convert_itk_to_image_3(indicator->GetOutput(), oss.str().c_str());
+#endif
+
     //perform gaussian smoothing
     typename GaussianFilterType::Pointer smoother = GaussianFilterType::New();
+    smoother->SetUseImageSpacing(true);//variance/std deviation is counted real world distances
     smoother->SetInput(indicator->GetOutput());
-    smoother->SetSigma(sigma);
+    smoother->SetVariance(sigma*sigma);
     smoother->Update();
+
+#ifdef CGAL_MESH_3_WEIGHTED_IMAGES_DEBUG
+    std::ostringstream oss1;
+    oss1 << "smooth_" << id << ".inr.gz";
+    std::cout << "filename = " << oss1.str().c_str() << std::endl;
+    internal::convert_itk_to_image_3(smoother->GetOutput(), oss1.str().c_str());
+#endif
 
     //take the max of smoothed indicator functions
     if (id == 0)
@@ -197,13 +250,21 @@ CGAL::Image_3 generate_label_weights_with_known_word_type(const CGAL::Image_3& i
     }
 
     id++;
+  }
+
 
 #ifdef CGAL_MESH_3_WEIGHTED_IMAGES_DEBUG
-    std::cout << "AFTER MAX (label = " << label << ") : " <<  std::endl;
-    std::cout << "\tnon zero in max ("
-      << label << ")\t= " << internal::count_non_white_pixels(blured_max.GetPointer()) << std::endl;
+    std::ostringstream oss2;
+    oss2 << "max_" << "all" << ".inr.gz";
+    std::cout << "filename = " << oss2.str().c_str() << std::endl;
+    internal::convert_itk_to_image_3(blured_max.GetPointer(), oss2.str().c_str());
 #endif
-  }
+
+#ifdef CGAL_MESH_3_WEIGHTED_IMAGES_DEBUG
+//    std::cout << "AFTER MAX (label = " << label << ") : " <<  std::endl;
+    std::cout << "\tnon zero in max ("
+      << id << ")\t= " << internal::count_non_white_pixels(blured_max.GetPointer()) << std::endl;
+#endif
 
   //copy pixels to weights
   std::copy(blured_max->GetBufferPointer(),
@@ -252,6 +313,76 @@ CGAL::Image_3 generate_label_weights(const CGAL::Image_3& image,
     "the image word type is a type that is not handled by "
     "CGAL_ImageIO.");
   return CGAL::Image_3();
+}
+
+void postprocess_weights_for_feature_protection(const CGAL::Image_3& image,
+                                                CGAL::Image_3& weights)
+{
+  typedef unsigned char Weights_type; //from 0 t 255
+  typedef std::array<Weights_type, 8> Cube;
+
+  using CGAL::IMAGEIO::static_evaluate;
+
+  for (std::size_t k = 0, end_k = image.zdim() - 1; k < end_k; ++k)
+  {
+    for (std::size_t j = 0, end_j = image.ydim() - 1; j < end_j; ++j)
+    {
+      for (std::size_t i = 0, end_i = image.xdim() - 1; i < end_i; ++i)
+      {
+        const Cube cube = {
+          static_evaluate<Weights_type>(image.image(), i  , j  , k),
+          static_evaluate<Weights_type>(image.image(), i + 1, j  , k),
+          static_evaluate<Weights_type>(image.image(), i  , j + 1, k),
+          static_evaluate<Weights_type>(image.image(), i + 1, j + 1, k),
+          static_evaluate<Weights_type>(image.image(), i  , j  , k + 1),
+          static_evaluate<Weights_type>(image.image(), i + 1, j  , k + 1),
+          static_evaluate<Weights_type>(image.image(), i  , j + 1, k + 1),
+          static_evaluate<Weights_type>(image.image(), i + 1, j + 1, k + 1),
+        };
+        std::array<Weights_type, 2> colors;
+        colors[0] = cube[0];
+        std::size_t nb_colors = 1;
+        if ( i == 0 || i == image.xdim() - 1) nb_colors++;
+        if ( j == 0 || j == image.ydim() - 1) nb_colors++;
+        if ( k == 0 || k == image.zdim() - 1) nb_colors++;
+
+        for (int ii = 1; ii < 8; ++ii)
+        {
+          if (colors[0] == cube[ii])
+            continue;
+          else if (nb_colors == 1)
+          {
+            ++nb_colors;
+            colors[1] = cube[ii];
+          }
+          else if (nb_colors == 2)
+          {
+            if (colors[1] == cube[ii])
+              continue;
+            else
+            {
+              Weights_type w1(1);
+              static_evaluate<Weights_type>(weights.image(), i, j, k) = w1;
+              static_evaluate<Weights_type>(weights.image(), i + 1, j, k) = w1;
+              static_evaluate<Weights_type>(weights.image(), i, j + 1, k) = w1;
+              static_evaluate<Weights_type>(weights.image(), i + 1, j + 1, k) = w1;
+              static_evaluate<Weights_type>(weights.image(), i, j, k + 1) = w1;
+              static_evaluate<Weights_type>(weights.image(), i + 1, j, k + 1) = w1;
+              static_evaluate<Weights_type>(weights.image(), i, j + 1, k + 1) = w1;
+              static_evaluate<Weights_type>(weights.image(), i + 1, j + 1, k + 1) = w1;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+#ifdef CGAL_MESH_3_WEIGHTED_IMAGES_DEBUG
+  std::cout << "non white in post-processed image \t= "
+    << internal::count_non_white_pixels<Weights_type>(weights) << std::endl;
+  _writeImage(weights.image(), "weights-image_postprocessed.inr.gz");
+#endif
 }
 
 }//namespace Mesh_3

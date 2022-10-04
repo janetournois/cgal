@@ -30,7 +30,7 @@ using namespace CGAL::parameters;
 int main(int argc, char* argv[])
 {
   /// [Loads image]
-  const std::string fname = (argc > 1) ? argv[1] : CGAL::data_file_path("images/liver.inr.gz");
+  const std::string fname = (argc > 1) ? argv[1] : CGAL::data_file_path("images/420.inr");// liver.inr.gz");
   CGAL::Image_3 image;
   if(!image.read(fname)){
     std::cerr << "Error: Cannot read file " <<  fname << std::endl;
@@ -39,9 +39,11 @@ int main(int argc, char* argv[])
   /// [Loads image]
 
   /// [Domain creation]
-  const float sigma = 10.f;
+  const float sigma = (std::max)(image.vx(), (std::max)(image.vy(), image.vz()));
   CGAL::Image_3 img_weights =
     CGAL::Mesh_3::generate_label_weights(image, sigma);
+
+  CGAL::Mesh_3::postprocess_weights_for_feature_protection(image, img_weights);
 
   Mesh_domain domain
     = Mesh_domain::create_labeled_image_mesh_domain(image,
@@ -54,7 +56,7 @@ int main(int argc, char* argv[])
                          cell_radius_edge_ratio=3, cell_size=8);
 
   /// [Meshing]
-  C3t3 c3t3 = CGAL::make_mesh_3<C3t3>(domain, criteria);
+  C3t3 c3t3 = CGAL::make_mesh_3<C3t3>(domain, criteria, no_exude(), no_perturb());
   /// [Meshing]
 
   // Output
