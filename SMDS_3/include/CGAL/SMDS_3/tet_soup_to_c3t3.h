@@ -138,6 +138,8 @@ bool build_finite_cells(Tr& tr,
     }
   }
   // build the finite cells
+  std::ofstream ofs("tetrahedra_with_negative_volume.polylines.txt");
+
   for(std::size_t i=0; i<finite_cells.size(); ++i)
   {
     const auto& tet = finite_cells[i];
@@ -153,6 +155,22 @@ bool build_finite_cells(Tr& tr,
     }
 
     // this assertion also tests for degeneracy
+    typename Tr::Geom_traits::Construct_point_3 cp =
+      tr.geom_traits().construct_point_3_object();
+    if (orientation(cp(tr.point(vs[0])), cp(tr.point(vs[1])), cp(tr.point(vs[2])), cp(tr.point(vs[3]))) != POSITIVE)
+    {
+      const auto p0 = cp(tr.point(vs[0]));
+      const auto p1 = cp(tr.point(vs[1]));
+      const auto p2 = cp(tr.point(vs[2]));
+      const auto p3 = cp(tr.point(vs[3]));
+      ofs << "6 " << p0 << " " << p1 << " " << p2 << " " << p0 << " " << p3 << " " << p2 << "\n";
+      ofs << "2 " << p1 << " " << p3 << "\n";
+
+      std::cout << "volume = "
+        << Tr::Geom_traits::Tetrahedron_3(p0, p1, p2, p3).volume()
+        << std::endl;
+    }
+
     CGAL_assertion(orientation(cp(tr.point(vs[0])), cp(tr.point(vs[1])),
                                cp(tr.point(vs[2])), cp(tr.point(vs[3])))
                      == POSITIVE);
@@ -215,6 +233,9 @@ bool build_finite_cells(Tr& tr,
       }
     }
   }
+
+  ofs.close();
+
   return success;
 }
 
