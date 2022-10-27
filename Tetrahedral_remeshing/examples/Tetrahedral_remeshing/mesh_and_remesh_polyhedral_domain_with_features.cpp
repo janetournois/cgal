@@ -7,6 +7,7 @@
 #include <CGAL/Polyhedral_mesh_domain_with_features_3.h>
 #include <CGAL/make_mesh_3.h>
 
+#include <CGAL/sliver_selection_property_map.h>
 #include <CGAL/tetrahedral_remeshing.h>
 
 // Domain
@@ -75,7 +76,8 @@ int main(int argc, char* argv[])
 
   const double target_edge_length = 0.1;//coarsen the mesh
   CGAL::tetrahedral_isotropic_remeshing(tr, target_edge_length,
-    CGAL::parameters::number_of_iterations(3));
+    CGAL::parameters::number_of_iterations(3)
+  .cell_is_selected_map(CGAL::sliver_selection_property_map(tr, 4./*min dihedral angle*/)));
 
   return EXIT_SUCCESS;
 }
