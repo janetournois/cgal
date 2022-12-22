@@ -362,17 +362,13 @@ public:
 #endif
 #ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
     mindh = 180.;
-    for (Cell_handle cit : tr().finite_cell_handles())
+    for (Cell_handle cit : m_c3t3.cells_in_complex())
     {
-      if (m_c3t3.is_in_complex(cit))
-      {
-        const double dh = min_dihedral_angle(tr(), cit);
-        mindh = (std::min)(dh, mindh);
-      }
+      const double dh = min_dihedral_angle(tr(), cit);
+      mindh = (std::min)(dh, mindh);
     }
     std::cout << "Peeling done (removed " << nb_slivers_peel << " slivers, "
       << "min dihedral angle = " << mindh << ")." << std::endl;
-
 #endif
     return nb_slivers_peel;
   }
