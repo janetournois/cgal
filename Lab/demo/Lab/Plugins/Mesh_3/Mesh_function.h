@@ -141,7 +141,7 @@ log() const
   QStringList res("Mesh criteria");
 
   // doubles
-  if(edge_sizing > 0)
+  if(edge_sizing > 0 && edge_sizing != DBL_MAX)
     res << QString("edge max size: %1").arg(edge_sizing);
   if(edge_min_sizing > 0)
     res << QString("edge min size: %1").arg(edge_min_sizing);
