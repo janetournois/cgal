@@ -31,6 +31,14 @@ endif()
 
 create_single_source_cgal_program("marching_cubes.cpp")
 
+find_package(OpenVDB CONFIG)
+if(TARGET OpenVDB::openvdb)
+  create_single_source_cgal_program("marching_cubes_openvdb.cpp")
+  target_link_libraries(marching_cubes_openvdb
+                               PUBLIC OpenVDB::openvdb
+                               PRIVATE OpenVDB::openvdb)
+endif()
+
 # undocumented
 create_single_source_cgal_program("marching_cubes_strategies.cpp")
 
@@ -54,6 +62,7 @@ if(TARGET CGAL::Eigen3_support)
     target_link_libraries(contouring_implicit_data PRIVATE CGAL::TBB_support)
     target_link_libraries(contouring_mesh_offset PRIVATE CGAL::TBB_support)
   endif()
+
 else()
   message(STATUS "NOTICE: Some examples use Eigen, and will not be compiled.")
 endif()
