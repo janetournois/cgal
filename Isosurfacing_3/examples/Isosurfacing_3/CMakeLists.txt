@@ -31,14 +31,6 @@ endif()
 
 create_single_source_cgal_program("marching_cubes.cpp")
 
-find_package(OpenVDB CONFIG)
-if(TARGET OpenVDB::openvdb)
-  create_single_source_cgal_program("marching_cubes_openvdb.cpp")
-  target_link_libraries(marching_cubes_openvdb
-                               PUBLIC OpenVDB::openvdb
-                               PRIVATE OpenVDB::openvdb)
-endif()
-
 # undocumented
 create_single_source_cgal_program("marching_cubes_strategies.cpp")
 
@@ -49,11 +41,20 @@ if(TARGET CGAL::Eigen3_support)
   create_single_source_cgal_program("contouring_implicit_data.cpp")
   create_single_source_cgal_program("contouring_mesh_offset.cpp")
 
+find_package(OpenVDB CONFIG)
+if(TARGET OpenVDB::openvdb)
+  create_single_source_cgal_program("marching_cubes_openvdb.cpp")
+  target_link_libraries(marching_cubes_openvdb
+                        PUBLIC OpenVDB::openvdb
+                        PRIVATE OpenVDB::openvdb)
+endif()
+
   target_link_libraries(dual_contouring PRIVATE CGAL::Eigen3_support)
   target_link_libraries(contouring_discrete_data PRIVATE CGAL::Eigen3_support)
   target_link_libraries(contouring_inrimage PRIVATE CGAL::Eigen3_support)
   target_link_libraries(contouring_implicit_data PRIVATE CGAL::Eigen3_support)
   target_link_libraries(contouring_mesh_offset PRIVATE CGAL::Eigen3_support)
+  target_link_libraries(marching_cubes_openvdb PRIVATE CGAL::Eigen3_support)
 
   if(TARGET CGAL::TBB_support)
     target_link_libraries(dual_contouring PRIVATE CGAL::TBB_support)
