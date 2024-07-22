@@ -218,20 +218,27 @@ Meshing_thread* cgal_code_mesh_3(const QList<const SMesh*> pMeshes,
     QString("\" with the following mesh parameters"
       "<ul>"
       "<li>Angle: %1</li>"
-      "<li>Edge size bound: %2</li>"
-      "<li>Edge min size bound :%3</li>"
-      "<li>Edge distance bound: %4</li>"
       "<li>Facets size bound: %5</li>"
       "<li>Approximation bound: %6</li>")
     .arg(facet_angle)
-    .arg(edge_size)
-    .arg(edge_min_size)
-    .arg(edge_distance)
     .arg(facet_sizing)
     .arg(facet_approx);
+  if (protect_features)
+  {
+    tooltip += QString("<li>Edge size bound: %2</li>"
+      "<li>Edge min size bound :%3</li>"
+      "<li>Edge distance bound: %4</li>")
+      .arg(edge_size)
+      .arg(edge_min_size)
+      .arg(edge_distance);
+  }
   if (!surface_only)
-    tooltip += QString("<li>Tetrahedra size bound: %1</li>")
-    .arg(tet_sizing);
+  {
+    tooltip += QString("<li>Tetrahedra size bound: %1</li>"
+      "<li>Tetrahedra shape bound: %1</li>")
+      .arg(tet_sizing)
+      .arg(tet_shape);
+  }
   tooltip += "</ul></div>";
 
   p_new_item->setProperty("toolTip", tooltip);

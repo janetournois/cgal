@@ -142,11 +142,11 @@ log() const
   QStringList res("Mesh criteria");
 
   // doubles
-  if(edge_sizing > 0)
+  if(protect_features && edge_sizing > 0)
     res << QString("edge max size: %1").arg(edge_sizing);
-  if(edge_min_sizing > 0)
+  if(protect_features && edge_min_sizing > 0)
     res << QString("edge min size: %1").arg(edge_min_sizing);
-  if(edge_distance > 0)
+  if(protect_features && edge_distance > 0)
     res << QString("edge max distance: %1").arg(edge_distance);
   if(facet_angle > 0)
     res << QString("facet min angle: %1").arg(facet_angle);
