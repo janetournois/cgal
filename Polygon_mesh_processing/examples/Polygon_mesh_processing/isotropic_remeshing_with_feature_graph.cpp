@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
 
   const double snap_distance = 2.;
 
-  PMP::snap_endpoints(sm_efeature_pmap, sm, snap_distance);
+  PMP::snap_endpoints(sm_efeature_pmap, sm, snap_distance, params::min_feature_length(3));
 
   std::cout << "Snapping done." << std::endl;
   std::cout << "sm size = " << sm.number_of_vertices() << std::endl;

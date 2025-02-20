@@ -77,10 +77,47 @@ namespace Polygon_mesh_processing {
     };
   }
 
+  template<typename Polylines,
+           typename EdgeIsConstrainedMap,
+           typename PolygonMesh>
+  void remove_short_features(Polylines& polylines,
+                             const std::size_t min_feature_length,
+                             EdgeIsConstrainedMap& ecmap,
+                             const PolygonMesh& mesh)
+  {
+    std::vector<std::size_t> to_remove;
+    for (std::size_t i = 0; i < polylines.size(); ++i)
+    {
+      const auto& polyline = polylines[i];
+      if (polyline.size() > min_feature_length)
+        continue;
+
+      to_remove.push_back(i);
+      for (std::size_t j = 0; j < polyline.size() - 1; ++j)
+      {
+        typename boost::graph_traits<PolygonMesh>::edge_descriptor e;
+        bool b;
+        boost::tie(e, b) = edge(polyline[j], polyline[j + 1], mesh);
+        if (b)
+          put(ecmap, e, false);
+      }
+    }
+
+    std::size_t nb_valid = polylines.size();
+    for (std::size_t i = 0; i < to_remove.size(); ++i)
+    {
+      std::swap(polylines[to_remove[i]], polylines[nb_valid - 1]);
+      --nb_valid;
+    }
+    polylines.erase(polylines.begin() + nb_valid, polylines.end());
+
+    CGAL_assertion(polylines.size() == nb_valid);
+  }
+
   /*!
   * GT
   * VPMap
-  * min_feature_length (shorter polylines are removed)
+  * min_feature_length (shorter polylines are removed from ecmap)
   */
   template <typename EdgeIsConstrainedMap,
             typename PolygonMesh,
@@ -115,7 +152,7 @@ namespace Polygon_mesh_processing {
     VPMap vpmap = choose_parameter(get_parameter(np, internal_np::vertex_point),
                                    get_const_property_map(vertex_point, mesh));
     std::size_t min_feature_length = choose_parameter(get_parameter(np, internal_np::min_feature_length),
-                                                      1);
+                                                      0);
 
     using Polyline = std::vector<vertex_descriptor>;
     using Polylines = std::vector<Polyline>;
@@ -182,6 +219,9 @@ namespace Polygon_mesh_processing {
 #ifdef CGAL_PMP_DEBUG_FEATURE_GRAPH
     std::cout << "# constrained polylines after split_graph_into_polylines() : " << polylines.size() << std::endl;
 #endif
+
+    if(min_feature_length > 0)
+      remove_short_features(polylines, min_feature_length, ecmap, mesh);
 
     auto add_to_map = [](const vertex_descriptor& v,
                          std::unordered_map<vertex_descriptor, unsigned int>& map)
