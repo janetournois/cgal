@@ -219,12 +219,9 @@ namespace Polygon_mesh_processing {
     Tree tree(tree_points.begin(), tree_points.end(), Splitter(), Tree_traits(vpmap));
     Distance tr_dist(vpmap);
 
-#ifdef CGAL_PMP_DEBUG_FEATURE_GRAPH
-    unsigned int nb_features_added = 0;
-#endif
-
     std::unordered_set<vertex_descriptor> removed_from_corners;
     std::unordered_set<vertex_descriptor> to_be_snapped_later;
+    std::unordered_map<vertex_descriptor, std::vector<halfedge_descriptor> > connections;
 
     // for each endpoint, find closest endpoint
     for (const auto& [endpoint, constraint_valence] : endpoints)
@@ -267,24 +264,13 @@ namespace Polygon_mesh_processing {
 
         // connect the two endpoints
         for (const halfedge_descriptor he : halfedge_sequence)
-        {
-          put(ecmap, edge(he, mesh), true);
-
-#ifdef CGAL_PMP_DEBUG_FEATURE_GRAPH
-          nb_features_added++;
-#endif //CGAL_PMP_DEBUG_FEATURE_GRAPH
-        }
+          connections[endpoint].push_back(he);
 
         //removed_from_corners.insert(endpoint);//keep endpoint for star-shaped connections
         removed_from_corners.insert(closest_endpoint);
         break;
       }
     }
-#ifdef CGAL_PMP_DEBUG_FEATURE_GRAPH
-    std::cout << "# Edges added to feature graph to connect corners : " << nb_features_added << std::endl;
-    nb_features_added = 0;
-#endif //CGAL_PMP_DEBUG_FEATURE_GRAPH
-
     // the set of endpoints is now reduced, because of connections that have been made
     // some endpoints may not have been connected, we need to snap them later
 
@@ -306,7 +292,7 @@ namespace Polygon_mesh_processing {
     }
     tree.insert(feature_vertices.begin(), feature_vertices.end());
 
-    for (const vertex_descriptor endpoint : to_be_snapped_later)
+    for (const auto& [endpoint, constraint_valence] : endpoints)
     {
       // search for close endpoints
       const Point_3& query = get(vpmap, endpoint);
@@ -329,16 +315,36 @@ namespace Polygon_mesh_processing {
         CGAL::shortest_path_between_two_vertices(endpoint, closest_pt, mesh,
                                                  std::back_inserter(halfedge_sequence));
 
+        const auto itendpoint = connections.find(endpoint);
+        if( itendpoint != connections.end())
+        {
+          auto& connection = itendpoint->second;
+          if (connection.size() < halfedge_sequence.size())
+            break;
+          else
+            connection.clear();
+        }
+
         // connect the two endpoints
         for (const halfedge_descriptor he : halfedge_sequence)
-        {
-          put(ecmap, edge(he, mesh), true);
+          connections[endpoint].push_back(he);
 
-#ifdef CGAL_PMP_DEBUG_FEATURE_GRAPH
-          nb_features_added++;
-#endif //CGAL_PMP_DEBUG_FEATURE_GRAPH
-        }
         break;
+      }
+    }
+
+    // add the connections to the mesh
+#ifdef CGAL_PMP_DEBUG_FEATURE_GRAPH
+    unsigned int nb_features_added = 0;
+#endif
+    for (const auto& [endpoint, path] : connections)
+    {
+      for (const halfedge_descriptor he : path)
+      {
+        put(ecmap, edge(he, mesh), true);
+#ifdef CGAL_PMP_DEBUG_FEATURE_GRAPH
+        nb_features_added++;
+#endif
       }
     }
 
