@@ -80,6 +80,7 @@ namespace Polygon_mesh_processing {
   /*!
   * GT
   * VPMap
+  * min_feature_length (shorter polylines are removed)
   */
   template <typename EdgeIsConstrainedMap,
             typename PolygonMesh,
@@ -113,6 +114,8 @@ namespace Polygon_mesh_processing {
     GT gt = choose_parameter<GT>(get_parameter(np, internal_np::geom_traits));
     VPMap vpmap = choose_parameter(get_parameter(np, internal_np::vertex_point),
                                    get_const_property_map(vertex_point, mesh));
+    std::size_t min_feature_length = choose_parameter(get_parameter(np, internal_np::min_feature_length),
+                                                      1);
 
     using Polyline = std::vector<vertex_descriptor>;
     using Polylines = std::vector<Polyline>;
@@ -180,29 +183,58 @@ namespace Polygon_mesh_processing {
     std::cout << "# constrained polylines after split_graph_into_polylines() : " << polylines.size() << std::endl;
 #endif
 
+    auto add_to_map = [](const vertex_descriptor& v,
+                         std::unordered_map<vertex_descriptor, unsigned int>& map)
+      {
+        auto it = map.find(v);
+        if (it != map.end())
+          map[v]++;
+        else
+          map.insert({ v, 1 });
+      };
+
     // keep only the endpoints of the polylines
-    std::unordered_set<vertex_descriptor> endpoints;
+    std::unordered_map<vertex_descriptor, unsigned int> endpoints;
     for (const Polyline& polyline : polylines)
     {
-      endpoints.insert(polyline.front());
-      endpoints.insert(polyline.back());
+      add_to_map(polyline.front(), endpoints);
+      add_to_map(polyline.back(), endpoints);
     }
 
 #ifdef CGAL_PMP_DEBUG_FEATURE_GRAPH
     std::cout << "# endpoints : " << endpoints.size() << std::endl;
+    std::ofstream out("endpoints.xyz");
+    for (const auto& [v, n] : endpoints)
+    {
+      const Point_3& p = get(vpmap, v);
+      out << p.x() << " " << p.y() << " " << p.z() << std::endl;
+    }
+    out.close();
 #endif
 
     // build a Kd-tree of endpoints
-    Tree tree(endpoints.begin(), endpoints.end(), Splitter(), Tree_traits(vpmap));
+    std::vector<vertex_descriptor> tree_points;
+    for (const auto& [v, n] : endpoints)
+      tree_points.push_back(v);
+    Tree tree(tree_points.begin(), tree_points.end(), Splitter(), Tree_traits(vpmap));
     Distance tr_dist(vpmap);
 
 #ifdef CGAL_PMP_DEBUG_FEATURE_GRAPH
     unsigned int nb_features_added = 0;
 #endif
 
+    std::unordered_set<vertex_descriptor> removed_from_corners;
+    std::unordered_set<vertex_descriptor> to_be_snapped_later;
+
     // for each endpoint, find closest endpoint
-    for (const vertex_descriptor& endpoint : endpoints)
+    for (const auto& [endpoint, constraint_valence] : endpoints)
     {
+      if (constraint_valence > 1)
+        continue;
+
+      if (removed_from_corners.find(endpoint) != removed_from_corners.end())
+        continue;
+
       // search for close endpoints
       const Point_3& query = get(vpmap, endpoint);
       const unsigned knn = 5;
@@ -215,9 +247,18 @@ namespace Polygon_mesh_processing {
         if (closest_endpoint == endpoint)
           continue;
 
+        else if (removed_from_corners.find(closest_endpoint) != removed_from_corners.end())
+        {
+          to_be_snapped_later.insert(endpoint);
+          continue;
+        }
+
         // if the distance is too big, skip it
         if (tr_dist.inverse_of_transformed_distance(it->second) > snap_distance)
+        {
+          to_be_snapped_later.insert(endpoint);
           break; //too far from source
+        }
 
         // otherwise, find the shortest path between the endpoint and the close endpoint
         std::vector<halfedge_descriptor> halfedge_sequence;
@@ -233,10 +274,76 @@ namespace Polygon_mesh_processing {
           nb_features_added++;
 #endif //CGAL_PMP_DEBUG_FEATURE_GRAPH
         }
+
+        //removed_from_corners.insert(endpoint);//keep endpoint for star-shaped connections
+        removed_from_corners.insert(closest_endpoint);
+        break;
       }
     }
 #ifdef CGAL_PMP_DEBUG_FEATURE_GRAPH
-    std::cout << "#Edges added to feature graph : " << nb_features_added << std::endl;
+    std::cout << "# Edges added to feature graph to connect corners : " << nb_features_added << std::endl;
+    nb_features_added = 0;
+#endif //CGAL_PMP_DEBUG_FEATURE_GRAPH
+
+    // the set of endpoints is now reduced, because of connections that have been made
+    // some endpoints may not have been connected, we need to snap them later
+
+    if (to_be_snapped_later.empty())
+      return;
+
+    // Build a kd-tree of all feature vertices,
+    // to snap remaining endpoints to the closest feature vertex,
+    // and create a T-shaped feature graph
+    tree.clear();
+    std::unordered_set<vertex_descriptor> feature_vertices;
+    for (const edge_descriptor e : edges(mesh))
+    {
+      if (get(ecmap, e))
+      {
+        feature_vertices.insert(source(halfedge(e, mesh), mesh));
+        feature_vertices.insert(target(halfedge(e, mesh), mesh));
+      }
+    }
+    tree.insert(feature_vertices.begin(), feature_vertices.end());
+
+    for (const vertex_descriptor endpoint : to_be_snapped_later)
+    {
+      // search for close endpoints
+      const Point_3& query = get(vpmap, endpoint);
+      const unsigned knn = 5;
+      const FT epsilon = 0.0;
+      K_neighbor_search search(tree, query, knn, epsilon, true, tr_dist);
+
+      for (auto it = search.begin(); it != search.end(); it++)
+      {
+        const vertex_descriptor closest_pt = it->first;
+        if (closest_pt == endpoint)
+          continue;
+
+        // if the distance is too big, skip it
+        if (tr_dist.inverse_of_transformed_distance(it->second) > snap_distance)
+          break; //too far from source
+
+        // otherwise, find the shortest path between the endpoint and the close endpoint
+        std::vector<halfedge_descriptor> halfedge_sequence;
+        CGAL::shortest_path_between_two_vertices(endpoint, closest_pt, mesh,
+                                                 std::back_inserter(halfedge_sequence));
+
+        // connect the two endpoints
+        for (const halfedge_descriptor he : halfedge_sequence)
+        {
+          put(ecmap, edge(he, mesh), true);
+
+#ifdef CGAL_PMP_DEBUG_FEATURE_GRAPH
+          nb_features_added++;
+#endif //CGAL_PMP_DEBUG_FEATURE_GRAPH
+        }
+        break;
+      }
+    }
+
+#ifdef CGAL_PMP_DEBUG_FEATURE_GRAPH
+    std::cout << "# Edges added to feature graph as T-junctions: " << nb_features_added << std::endl;
 #endif //CGAL_PMP_DEBUG_FEATURE_GRAPH
   }
 
