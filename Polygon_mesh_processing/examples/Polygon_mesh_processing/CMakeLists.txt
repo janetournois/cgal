@@ -108,6 +108,9 @@ if(OpenMesh_FOUND)
     target_link_libraries(hole_filling_example_OM PRIVATE CGAL::Eigen3_support CGAL::OpenMesh_support)
   endif()
 
+  create_single_source_cgal_program("isotropic_remeshing_with_feature_graph.cpp")
+  target_link_libraries(isotropic_remeshing_with_feature_graph PRIVATE CGAL::OpenMesh_support)
+
   create_single_source_cgal_program("point_inside_example_OM.cpp")
   target_link_libraries(point_inside_example_OM PRIVATE CGAL::OpenMesh_support)
 

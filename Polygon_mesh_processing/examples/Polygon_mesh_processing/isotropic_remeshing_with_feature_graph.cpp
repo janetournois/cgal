@@ -48,7 +48,10 @@ int main(int argc, char* argv[])
 
   PMP::snap_endpoints(sm_efeature_pmap, sm, snap_distance);
 
-  CGAL::IO::write_OBJ("out_features_snapped.om", sm,
+  std::cout << "Snapping done." << std::endl;
+  std::cout << "sm size = " << sm.number_of_vertices() << std::endl;
+
+  CGAL::IO::write_OM("out_features_snapped.om", sm,
                       params::edge_is_constrained_map(sm_efeature_pmap)
                      .stream_precision(17));
 

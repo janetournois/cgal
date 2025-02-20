@@ -220,12 +220,9 @@ namespace Polygon_mesh_processing {
           break; //too far from source
 
         // otherwise, find the shortest path between the endpoint and the close endpoint
-        std::cerr << "endpoint to closest_endpoint :" << std::endl;
-        std::cerr << get(vpmap, endpoint) << " " << get(vpmap, closest_endpoint) << std::endl;
-
         std::vector<halfedge_descriptor> halfedge_sequence;
         CGAL::shortest_path_between_two_vertices(endpoint, closest_endpoint, mesh,
-          std::back_inserter(halfedge_sequence));
+                                                 std::back_inserter(halfedge_sequence));
 
         // connect the two endpoints
         for (const halfedge_descriptor he : halfedge_sequence)
