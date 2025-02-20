@@ -118,6 +118,8 @@ namespace Polygon_mesh_processing {
   * GT
   * VPMap
   * min_feature_length (shorter polylines are removed from ecmap)
+  * @todo use edge_weight to define the shortest path, and the short polylines
+  *       to remove
   */
   template <typename EdgeIsConstrainedMap,
             typename PolygonMesh,
