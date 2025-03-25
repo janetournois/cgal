@@ -276,6 +276,27 @@ public:
     return true;
   }
 
+  std::size_t preprocess(const double sliver_angle = 0.01)
+  {
+#ifdef CGAL_TETRAHEDRAL_REMESHING_VERBOSE
+    std::cout << "Preprocess...";
+    std::cout.flush();
+#endif
+
+    const std::size_t nb_peeled
+      = CGAL::Tetrahedral_remeshing::peel_slivers_from_convex_hull(m_c3t3, sliver_angle);
+
+#ifdef CGAL_TETRAHEDRAL_REMESHING_DEBUG
+    CGAL_assertion(tr().tds().is_valid(true));
+    CGAL_assertion(debug::are_cell_orientations_valid(tr()));
+#endif
+#ifdef CGAL_DUMP_REMESHING_STEPS
+    CGAL::Tetrahedral_remeshing::debug::dump_c3t3(m_c3t3, "00-preprocess");
+#endif
+
+    return nb_peeled;
+  }
+
   //peel off slivers
   std::size_t postprocess(const double sliver_angle = 2.)
   {
@@ -599,6 +620,8 @@ public:
   void remesh(const std::size_t& max_it,
               const std::size_t& nb_extra_iterations)
   {
+    preprocess();//peel off convex hull slivers
+
     std::size_t it_nb = 0;
     while (it_nb < max_it)
     {

@@ -42,6 +42,30 @@ struct All_cells_selected
   {} //nothing to do : subdomain indices are updated in remeshing};
 };
 
+template<typename Tr>
+struct Convex_hull_outside_cells_pmap
+{
+  using value_type = bool;
+  using reference = bool;
+  using key_type = typename Tr::Cell_handle;
+  using category = boost::readable_property_map_tag;
+
+  const Tr& tr_;
+
+  friend bool get(const Convex_hull_outside_cells_pmap& m, const key_type& c)
+  {
+    using SI = typename Tr::Cell::Subdomain_index;
+    if(c->subdomain_index() != SI())
+      return false;
+    for(int i = 0; i < 4; ++i)
+    {
+      if(m.tr_.is_infinite(c->neighbor(i)))
+        return true;
+    }
+    return false;
+  }
+};
+
 } // end namespace internal
 } // end namespace Tetrahedral_remeshing
 } // end namespace CGAL

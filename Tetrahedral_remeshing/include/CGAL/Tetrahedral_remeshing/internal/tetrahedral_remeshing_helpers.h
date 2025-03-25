@@ -531,41 +531,6 @@ bool edges_form_a_sharp_angle(const EdgesVector& incident_edges,
   return angle < angle_bound;
 }
 
-template<typename C3t3>
-bool is_peelable(const C3t3& c3t3,
-                 const typename C3t3::Cell_handle ch,
-                 std::array<bool, 4>& facets_on_surface)
-{
-  typedef typename C3t3::Triangulation::Geom_traits::FT FT;
-  typedef typename C3t3::Facet                          Facet;
-
-  if(!c3t3.is_in_complex(ch))
-    return false;
-
-  bool on_surface = false;
-  for (int i = 0; i < 4; ++i)
-  {
-    facets_on_surface[i] = !c3t3.is_in_complex(ch->neighbor(i));
-    on_surface = on_surface || facets_on_surface[i];
-  }
-  if(!on_surface)
-    return false;
-
-  FT area_on_surface = 0.;
-  FT area_inside = 0.;
-  for (int i = 0; i < 4; ++i)
-  {
-    Facet f(ch, i);
-    const FT facet_area = CGAL::approximate_sqrt(c3t3.triangulation().triangle(f).squared_area());
-    if(facets_on_surface[i])
-      area_on_surface += facet_area;
-    else
-      area_inside += facet_area;
-  }
-
-  return (area_inside < 1.5 * area_on_surface);
-}
-
 template<typename Tr>
 typename Tr::Geom_traits::Vector_3 facet_normal(const Tr& tr,
                                                 const typename Tr::Facet& f)
@@ -623,6 +588,15 @@ CGAL::Triple<Vh, Vh, Vh> make_vertex_triple(const Vh vh0, const Vh vh1, const Vh
   if (ft.template get<2>() < ft.template get<1>()) std::swap(ft.template get<1>(), ft.template get<2>());
   if (ft.template get<1>() < ft.template get<0>()) std::swap(ft.template get<0>(), ft.template get<1>());
   return ft;
+}
+
+template<typename Facet>
+auto
+make_vertex_triple(const Facet& f)
+{
+  return make_vertex_triple(f.first->vertex((f.second + 1) % 4),
+                            f.first->vertex((f.second + 2) % 4),
+                            f.first->vertex((f.second + 3) % 4));
 }
 
 template<typename Vh>
