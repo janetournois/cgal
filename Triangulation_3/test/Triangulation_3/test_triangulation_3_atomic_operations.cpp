@@ -35,6 +35,7 @@ int main()
 
   std::size_t count_edge_flips = 0;
   std::size_t count_facet_flips = 0;
+  std::size_t count_collapses = 0;
 
   T3::Edge e = *tr.finite_edges_begin();
   if(tr.flip(e))
@@ -44,8 +45,13 @@ int main()
   if(tr.flip(f))
     ++count_facet_flips;
 
+  T3::Edge e2 = *tr.finite_edges_begin();
+  if(tr.collapse(e2) != T3::Vertex_handle())
+    ++count_collapses;
+
   std::cout << "Number of edge flips: " << count_edge_flips << std::endl;
   std::cout << "Number of facet flips: " << count_facet_flips << std::endl;
+  std::cout << "Number of collapses: " << count_collapses << std::endl;
 
   return EXIT_SUCCESS;
 }
