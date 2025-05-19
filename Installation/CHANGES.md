@@ -6,6 +6,12 @@
 ### General Changes
 - The minimal supported version of Boost is now 1.74.0.
 
+
+### [3D Constrained Triangulations](https://doc.cgal.org/6.1/Manual/packages.html#PkgConstrainedTriangulation3) (new package)
+-   This package adds the function `CGAL::make_conforming_constrained_Delaunay_triangulation_3()`
+    to create a conforming constrained Delaunay triangulation in 3D, which can be represented by the new
+    class template `CGAL::Conforming_constrained_Delaunay_triangulation_3`.
+
 ### 2D Triangulations on Hyperbolic Surfaces (new package)
 -   This package enables building and handling triangulations of closed orientable hyperbolic surfaces.
     It offers functions for the generation of the triangulation from a convex fundamental domain,
@@ -15,7 +21,7 @@
 ### 3D Isosurfacing (new package)
 
 -   This package provides algorithms to extract isosurfaces from different inputs. The input is represented
-    as a 3D domain and can be an implicit function or a Cartesian grid. The output is an indexed face
+    as a 3D domain and can be an implicit function or a %Cartesian grid. The output is an indexed face
     set that stores an isosurface in the form of a surface mesh. The provided algorithms include Marching Cubes,
     topologically correct Marching Cubes, and Dual Contouring.
 
@@ -58,6 +64,9 @@
   - `initial_points_generator` : enables the user to specify a functor that generates initial points,
   - `initial_points` : enables the user to specify a `Range` of initial points.
 -   Added a new meshing parameter `surface_only`, to improve performances when the user is only interested in surface mesh generation.
+  
+### [Poisson Surface Reconstruction](https://doc.cgal.org/6.1/Manual/packages.html#PkgPoissonSurfaceReconstruction3)
+-   Added a new mesh domain `Poisson_mesh_domain_3` that integrates some optimizations from the deprecated 3D Surface Mesh Generation package.
 
 ### [3D Subdivision Methods](https://doc.cgal.org/6.1/Manual/packages.html#PkgSurfaceSubdivisionMethod3)
 
