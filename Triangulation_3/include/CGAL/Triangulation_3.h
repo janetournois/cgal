@@ -1112,6 +1112,10 @@ public:
   void flip_flippable(const Edge& e) { flip_flippable(e.first, e.second, e.third); }
   void flip_flippable(Cell_handle c, int i, int j);
 
+  //COLLAPSE
+  // returns 'Vertex_handle()' if the edge is not collapsible
+  Vertex_handle collapse(const Edge& e);
+
   //INSERTION
   Vertex_handle insert(const Point& p, Vertex_handle hint) {
     return insert(p, hint == Vertex_handle() ? infinite_cell() : hint->cell());
@@ -3714,6 +3718,14 @@ side_of_edge(const Point& p,
     default: // case MIDDLE: case AFTER: case TARGET:
       return ON_UNBOUNDED_SIDE;
   }
+}
+
+template <class GT, class Tds, class Lds>
+typename Triangulation_3<GT, Tds, Lds>::Vertex_handle
+Triangulation_3<GT, Tds, Lds>::
+collapse(const Edge& e)
+{
+  return false; // not implemented
 }
 
 template < class GT, class Tds, class Lds >
