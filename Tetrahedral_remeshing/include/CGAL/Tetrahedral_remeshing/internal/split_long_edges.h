@@ -381,8 +381,8 @@ void split_long_edges(C3T3& c3t3,
 
     const std::optional<FT> sqlen = is_too_long(e, boundary, sizing, c3t3, cell_selector);
     if(sqlen != std::nullopt)
-      long_edges.insert(long_edge(make_vertex_pair(e), sqlen.value()));
-  }
+      //long_edges.insert(long_edge(make_vertex_pair(e), sqlen.value()));
+      long_edges.push_back(make_pair(make_vertex_pair(e), sqlen.value()));  }
 
 #ifdef CGAL_TETRAHEDRAL_REMESHING_DEBUG
   debug::dump_edges(long_edges, "long_edges.polylines.txt");
