@@ -50,6 +50,11 @@
 #include <sstream>
 #include <atomic>
 
+#include <CGAL/Exact_predicates_exact_constructions_kernel.h>
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Cartesian_converter.h>
+
+
 namespace CGAL {
 
 namespace Mesh_3 {
@@ -1492,6 +1497,89 @@ before_insertion_impl(const Facet& facet,
   {
     const Facet source_other_side = mirror_facet(facet);
 
+    using EK = CGAL::Exact_predicates_exact_constructions_kernel;
+    using IK = CGAL::Exact_predicates_inexact_constructions_kernel;
+    CGAL::Cartesian_converter<IK, EK> to_exact;
+    CGAL::Cartesian_converter<EK, IK> to_inexact;
+
+    std::ofstream ofs("empty_zone.mesh");
+    CGAL::IO::write_MEDIT(ofs, r_tr_, CGAL::parameters::all_cells(true));
+    ofs.close();
+
+    auto wdist = r_tr_.geom_traits().compute_power_product_3_object();
+    auto dist = [&](Weighted_point sp, Weighted_point p) -> double
+    {
+      return std::sqrt(wdist(sp, p));
+    };
+
+    auto robust_cc = [&](Cell_handle c, bool force_exact) {
+      return r_tr_.geom_traits().construct_weighted_circumcenter_3_object()(
+                c->vertex(0)->point(), c->vertex(1)->point(),
+                c->vertex(2)->point(), c->vertex(3)->point(),
+                force_exact);
+    };
+    auto exact_cc = [&](Cell_handle c) {
+      return EK().construct_weighted_circumcenter_3_object()(to_exact(c->vertex(0)->point()),
+                                                             to_exact(c->vertex(1)->point()),
+                                                             to_exact(c->vertex(2)->point()),
+                                                             to_exact(c->vertex(3)->point()));
+    };
+    auto inexact_cc = [&](Cell_handle c) {
+      return IK().construct_weighted_circumcenter_3_object()(c->vertex(0)->point(), c->vertex(1)->point(),
+                                                             c->vertex(2)->point(), c->vertex(3)->point());
+    };
+
+    Cell_handle c1 = facet.first;
+    Cell_handle c2 = facet.first->neighbor(facet.second);
+
+    std::cout << std::setprecision(17)
+      << "d0 = " << dist(point, r_tr_.point(facet.first, (facet.second + 1) & 3)) << std::endl
+      << "d1 = " << dist(point, r_tr_.point(facet.first, (facet.second + 2) & 3)) << std::endl
+      << "d2 = " << dist(point, r_tr_.point(facet.first, (facet.second + 3) & 3)) << std::endl
+              << "dual [cc(c1), cc(c2)]: " << std::endl
+              << "c1 robust cc\t\t= "       << robust_cc(c1, false) << std::endl
+              << "c1 epick cc\t\t= " << inexact_cc(c1) << std::endl
+              << "c1 robust exact cc\t= " << robust_cc(c1, true) << std::endl
+              << "c1 epeck cc\t\t= "        << exact_cc(c1) << std::endl
+              << std::endl
+              << "c2 robust cc\t\t= " << robust_cc(c2, false) << std::endl
+              << "c2 epick cc\t\t= " << inexact_cc(c2) << std::endl
+              << "c2 robust exact cc\t= " << robust_cc(c2, true) << std::endl
+              << "c2 epeck cc\t\t= " << exact_cc(c2) << std::endl
+              ;
+
+    auto cc1_exact = exact_cc(c1);
+    auto cc2_exact = exact_cc(c2);
+    auto cc1_inexact = inexact_cc(c1);
+    auto cc2_inexact = inexact_cc(c2);
+
+    auto construct_intersection = r_oracle_.construct_intersection_object();
+    K::Segment_3 dual_exact(to_inexact(cc1_exact), to_inexact(cc2_exact));
+    Intersection intersect_exact_cc = construct_intersection(dual_exact);
+    Point_3 steiner_exact = std::get<0>(intersect_exact_cc);
+
+    std::cout << "steiner      \t= " << point << std::endl;
+    std::cout << "steiner_exact\t= " << steiner_exact << std::endl;
+
+    auto steiner_in_conflict = [&](Cell_handle c) {
+      return r_tr_.side_of_power_sphere(c, point) == ON_BOUNDED_SIDE;
+    };
+    auto steiner_exact_in_conflict = [&](Cell_handle c) {
+      return r_tr_.side_of_power_sphere(c, Weighted_point(steiner_exact)) == ON_BOUNDED_SIDE;
+    };
+
+    std::cout << "In sphere tests :" << std::endl
+              << "cc1 inexact : \t " << std::boolalpha << steiner_in_conflict(c1) << std::endl
+              << "cc2 inexact : \t " << std::boolalpha << steiner_in_conflict(c2) << std::endl
+              << "cc1 exact :   \t " << std::boolalpha << steiner_exact_in_conflict(c1) << std::endl
+              << "cc2 exact :   \t " << std::boolalpha << steiner_exact_in_conflict(c2) << std::endl;
+
+    if(!steiner_in_conflict(c1) && steiner_exact_in_conflict(c1))
+    {
+      auto cc1 = robust_cc(c1, false);
+      auto cc2 = robust_cc(c2, false);
+    }
+
     using boost::io::group;
     using std::setprecision;
 
@@ -1514,14 +1602,14 @@ before_insertion_impl(const Facet& facet,
       % group(setprecision(17), r_tr_.point(facet.first, (facet.second + 1)&3))
       % group(setprecision(17), r_tr_.point(facet.first, (facet.second + 2)&3))
       % group(setprecision(17), r_tr_.point(facet.first, (facet.second + 3)&3))
-      % r_tr_.point(facet.first, 0)
-      % r_tr_.point(facet.first, 1)
-      % r_tr_.point(facet.first, 2)
-      % r_tr_.point(facet.first, 3)
-      % r_tr_.point(source_other_side.first, 0)
-      % r_tr_.point(source_other_side.first, 1)
-      % r_tr_.point(source_other_side.first, 2)
-      % r_tr_.point(source_other_side.first, 3);
+      % group(setprecision(17), r_tr_.point(facet.first, 0))
+      % group(setprecision(17), r_tr_.point(facet.first, 1))
+      % group(setprecision(17), r_tr_.point(facet.first, 2))
+      % group(setprecision(17), r_tr_.point(facet.first, 3))
+      % group(setprecision(17), r_tr_.point(source_other_side.first, 0))
+      % group(setprecision(17), r_tr_.point(source_other_side.first, 1))
+      % group(setprecision(17), r_tr_.point(source_other_side.first, 2))
+      % group(setprecision(17), r_tr_.point(source_other_side.first, 3));
 
     CGAL_error_msg(error_msg.str().c_str());
   }
