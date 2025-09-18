@@ -168,7 +168,7 @@ public:
     init_c3t3(vcmap, ecmap, fcmap);
     m_vertex_smoother.init(m_c3t3);
 
-    m_elementary_remesher.smooth_init(m_c3t3,m_sizing,cell_selector,m_protect_boundaries,smooth_constrained_edges);
+    m_elementary_remesher.smooth_init(m_sizing,cell_selector,m_protect_boundaries,smooth_constrained_edges);
 
 #ifdef CGAL_DUMP_REMESHING_STEPS
     CGAL::Tetrahedral_remeshing::debug::dump_c3t3(m_c3t3, "00-init");
