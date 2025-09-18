@@ -118,7 +118,7 @@ public:
   void smooth()
   {
       // Refresh context data right before use to ensure triangulation hasn't changed
-      assert(m_context);
+      CGAL_assertion(m_context != nullptr);
       m_context->refresh(m_c3t3);
 
       if(!m_context->m_protect_boundaries) {

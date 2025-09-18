@@ -396,8 +396,9 @@ public:
   }
 
 private:
-  bool execute_boundary_edge_flip(const ElementType& e, C3t3& c3t3) {
-    assert(get_static_boundary_vertices_valences().size() > 0 &&
+  bool execute_boundary_edge_flip(const ElementType& e, C3t3& c3t3)
+  {
+    CGAL_assertion(get_static_boundary_vertices_valences().size() > 0 &&
            "Boundary vertices valences must be initialized before flipping boundary edges.");
     // For boundary edges, e is a vertex pair
     const auto& vp = e;
