@@ -238,54 +238,91 @@ private:
   bool apply_ordered_processing(
     std::vector<ElementType>& elements,
     Operation& op,
-    C3t3& c3t3)
+    C3t3& c3t3,
+    const CGAL::Bbox_3& bb)
     {
 #if defined CGAL_CONCURRENT_TETRAHEDRAL_REMESHING && defined CGAL_LINKED_WITH_TBB
-    // Create concurrent priority queue for all elements
-    tbb::concurrent_queue<ElementType> work_queue(elements.begin(), elements.end());
-
 
 #ifdef CGAL_TETRAHEDRAL_REMESHING_WRITE_LOCK_STATS
     std::atomic<size_t> num_successful_locks = 0;
     std::atomic<size_t> num_failed_locks = 0;
 #endif
-    //size_t num_threads = 8; // Start with single thread for ordered processing
-    size_t num_threads = std::thread::hardware_concurrency() / 2;
 
-    // Parallel work stealing from priority queue
-    tbb::parallel_for(0,                       // beginning
-      tbb::this_task_arena::max_concurrency(), // max nb of threads
-      [&](int /*thread_id*/)
+    const double min_sq_dim = (std::min)(CGAL::square(bb.xmax() - bb.xmin()),
+                                (std::min)(CGAL::square(bb.ymax() - bb.ymin()),
+                                           CGAL::square(bb.zmax() - bb.zmin())));
+    const float grid_cell_size = 0.5f * CGAL::approximate_sqrt(min_sq_dim);
+    const float inv_cell_size = 1./grid_cell_size;
+
+    struct Grid_cell_index
+    {
+      int i, j, k;
+      bool operator==(const Grid_cell_index& other) const
+      { return i == other.i && j == other.j && k == other.k; }
+    };
+
+    // to use unordered_map
+    struct Grid_cell_index_hasher
+    {
+      std::size_t operator()(const Grid_cell_index& ci) const
       {
-        while(true)
-        {
-          ElementType element;
-          if(work_queue.try_pop(element))
+        return ((std::hash<int>()(ci.i) ^ (std::hash<int>()(ci.j) << 1)) >> 1) ^ (std::hash<int>()(ci.k) << 1);
+      }
+    };
+
+    auto compute_cell_index
+      = [&](const typename C3t3::Triangulation::Geom_traits::Point_3& p)->Grid_cell_index
           {
-            // Process element - priority order maintained by queue
-            // Retry until lock is acquired
-            bool lock_acquired = false;
-            while (!lock_acquired) {
-              lock_acquired = op.lock_zone(element, c3t3);
-              if (!lock_acquired) {
-                // Unlock all elements before retrying
-                c3t3.triangulation().unlock_all_elements();
-                // Optional: small delay to reduce contention
-                std::this_thread::yield();
-#ifdef CGAL_TETRAHEDRAL_REMESHING_WRITE_LOCK_STATS
-                num_failed_locks++;
-#endif
-              }
-            }
-            // Execute operation once lock is acquired
-            op.execute_operation(element, c3t3);
-#ifdef CGAL_TETRAHEDRAL_REMESHING_WRITE_LOCK_STATS
-            num_successful_locks++;
-#endif
+            return {static_cast<int>(std::floor(p.x() * inv_cell_size)),
+                    static_cast<int>(std::floor(p.y() * inv_cell_size)),
+                    static_cast<int>(std::floor(p.z() * inv_cell_size))};
+          };
+
+    std::unordered_map<Grid_cell_index, std::vector<ElementType>, Grid_cell_index_hasher> spatialBuckets;
+    for(const auto& e : elements)
+    {
+      Grid_cell_index idx = compute_cell_index(op.point_on_element(e));
+      spatialBuckets[idx].push_back(e);
+    }
+
+//    /// dump spatial buckets
+//    int bucket_id = 1;
+//    for(auto [_,vec] : spatialBuckets)
+//    {
+//      std::string fname("bucket");
+//      fname += std::to_string(bucket_id++);
+//      fname += ".xyz";
+//      std::ofstream os(fname);
+//
+//      for(auto e : vec)
+//        os << op.point_on_element(e) << std::endl;
+//      os.close();
+//    }
+//    /// end dump spatial buckets
+
+    tbb::parallel_for_each(spatialBuckets.begin(),
+                           spatialBuckets.end(),
+      [&](const std::pair<const Grid_cell_index, std::vector<ElementType>>& bucket)
+      {
+        for(const auto& element : bucket.second)
+        {
+          while(!op.lock_zone(element, c3t3))
+          {
+            // Unlock all elements before retrying
             c3t3.triangulation().unlock_all_elements();
+            std::this_thread::yield(); // backoff to reduce contention
+
+#ifdef CGAL_TETRAHEDRAL_REMESHING_WRITE_LOCK_STATS
+            num_failed_locks++;
+#endif
           }
-          else
-            break;// work_queue is empty : break while(true) loop
+
+          // Execute operation once lock is acquired
+          op.execute_operation(element, c3t3);
+#ifdef CGAL_TETRAHEDRAL_REMESHING_WRITE_LOCK_STATS
+          num_successful_locks++;
+#endif
+          c3t3.triangulation().unlock_all_elements();
         }
       }
     );
@@ -307,7 +344,8 @@ private:
       const double lock_success_rate = (attempts == 0) ? 0.0 : 100.0 * static_cast<double>(num_successful_locks) / static_cast<double>(attempts);
       ofs << op.operation_name() << "," << num_successful_locks << "," << num_failed_locks << "," << lock_success_rate << "," << operation_exec_counter << std::endl;
     }
-    #endif
+#endif //write_lock_stats
+
 #endif //concurrent
 
     return true;
@@ -317,8 +355,9 @@ private:
   bool apply_unordered_processing(
     std::vector<ElementType>& elements,
     Operation& op,
-    C3t3& c3t3)
-    {
+    C3t3& c3t3,
+    const CGAL::Bbox_3&)
+  {
 #if defined CGAL_CONCURRENT_TETRAHEDRAL_REMESHING && defined CGAL_LINKED_WITH_TBB
     std::random_device rd;
     std::mt19937 g(rd());
@@ -392,11 +431,8 @@ public:
     }
 
     // Choose processing strategy based on operation requirements
-    if (op.requires_ordered_processing()) {
-      return apply_ordered_processing(elements, op, c3t3);
-    } else {
-      return apply_unordered_processing(elements, op, c3t3);
-    }
+    //if (op.requires_ordered_processing()) { //elements are already sorted when needed
+    return apply_ordered_processing(elements, op, c3t3, c3t3.bbox());
   }
 }; // class ElementaryOperationExecution
 

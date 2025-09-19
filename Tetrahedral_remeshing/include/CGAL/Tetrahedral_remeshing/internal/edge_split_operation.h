@@ -267,6 +267,12 @@ public:
     return false;
   }
 
+  typename Tr::Geom_traits::Point_3 point_on_element(const ElementType& e) const
+  {
+    auto cp = typename Tr::Geom_traits().construct_point_3_object();
+    return cp(e.second.first->point());
+  }
+
   bool requires_ordered_processing() const override {
     return true; // EdgeSplit requires ordered processing for optimal performance
   }

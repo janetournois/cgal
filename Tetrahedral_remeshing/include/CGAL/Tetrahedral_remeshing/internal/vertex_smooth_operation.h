@@ -440,6 +440,13 @@ public:
     m_context = p_context;
   }
 
+  typename Gt::Point_3
+  point_on_element(const Vertex_handle& v) const
+  {
+    auto cp = Gt().construct_point_3_object();
+    return cp(v->point());
+  }
+
 protected:
 
   Point_3 project_on_tangent_plane(const Point_3& gi,
