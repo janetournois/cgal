@@ -81,6 +81,7 @@ class Adaptive_remesher
 {
   typedef Triangulation Tr;
   typedef typename Tr::Geom_traits::FT FT;
+  typedef typename Tr::Geom_traits::Point_3 Point_3;
 
   typedef CGAL::Mesh_complex_3_in_triangulation_3<Tr, CornerIndex, CurveIndex> C3t3;
 
@@ -333,12 +334,12 @@ public:
 
   void finalize()
   {
-    if (input_is_c3t3())
-    {
       //reset far points dimension
       for (Vertex_handle v : m_far_points)
         v->set_dimension(-1);
-      m_c3t3_pbackup->swap(m_c3t3);
+
+    if(input_is_c3t3()) {
+        m_c3t3_pbackup->swap(m_c3t3);
     }
     else
       m_tr_pbackup->swap(m_c3t3.triangulation());
@@ -367,15 +368,22 @@ private:
     //TODO: Adding far points could reduce the number of conflicting locks. add_far_points currently leads to wrong quality metrics. We should debug this and test if performance is improved.
     //CGAL::Tetrahedral_remeshing::debug::dump_medit(m_c3t3, "before_addition_far_points.medit");
     //CGAL::Tetrahedral_remeshing::debug::count_far_points(m_c3t3);
-#ifdef ADD_FAR_POINTS
-    add_far_points(m_c3t3);
-    #endif
+    bool far_points_added = false;
+#if defined CGAL_LINKED_WITH_TBB \
+  && defined CGAL_CONCURRENT_TETRAHEDRAL_REMESHING
+    if(!triangulation_has_far_points())
+    {
+      add_far_points(m_c3t3);
+      far_points_added = true;
+    }
+#endif
+
     //CGAL::Tetrahedral_remeshing::debug::dump_far_points(m_c3t3, "far_points_debug");
     //CGAL::Tetrahedral_remeshing::debug::dump_triangulation_cells(m_c3t3.triangulation(), "far_point_cells.mesh");
     //CGAL::Tetrahedral_remeshing::debug::count_far_points(m_c3t3);
     //CGAL::Tetrahedral_remeshing::debug::dump_medit(m_c3t3, "after_addition_far_points.medit");
     //CGAL::Tetrahedral_remeshing::debug::dump_binary(m_c3t3, "after_addition_far_points");
-    if (input_is_c3t3())
+    if (far_points_added || input_is_c3t3())
       backup_far_points();
 
     const Subdomain_index default_subdomain = default_subdomain_index();
@@ -520,6 +528,8 @@ private:
 #endif
   }
 
+private:
+
   void backup_far_points()
   {
     for (Vertex_handle v : tr().finite_vertex_handles())
@@ -529,23 +539,33 @@ private:
     }
   }
 
-private:
-
-    void add_far_points(C3t3& c3t3)
+  bool triangulation_has_far_points() const
+  {
+    for (Vertex_handle v : tr().finite_vertex_handles())
     {
-    const Bbox_3& bbox =c3t3.bbox();
+      if (v->in_dimension() == -1)
+        return true;
+    }
+    return false;
+  }
+
+  void add_far_points(C3t3& c3t3)
+  {
+    const Bbox_3& bbox = c3t3.bbox();
 
     // Compute radius for far sphere
     const double xdelta = bbox.xmax() - bbox.xmin();
     const double ydelta = bbox.ymax() - bbox.ymin();
     const double zdelta = bbox.zmax() - bbox.zmin();
     const double radius = 5. * std::sqrt(xdelta * xdelta + ydelta * ydelta + zdelta * zdelta);
-    using Pt = typename Triangulation::Point;
-    using Vector = typename Kernel_traits<Pt>::Kernel::Vector_3;
-    const Vector center(bbox.xmin() + 0.5 * xdelta, bbox.ymin() + 0.5 * ydelta, bbox.zmin() + 0.5 * zdelta);
+
+    auto vector_ctor = tr().geom_traits().construct_vector_3_object();
+    const auto center_vec = vector_ctor(bbox.xmin() + 0.5 * xdelta,
+                                        bbox.ymin() + 0.5 * ydelta,
+                                        bbox.zmin() + 0.5 * zdelta);
+
     CGAL::Random rnd(0);
-    //CGAL::Random_points_on_sphere_3<Triangulation::Bare_point> random_point(radius, rnd);
-    CGAL::Random_points_on_sphere_3<Pt> random_point(radius, rnd);
+    CGAL::Random_points_on_sphere_3<Point_3> random_point(radius, rnd);
     constexpr int num_pseudo_infinite_vertices_per_core = 5;
     const int NUM_PSEUDO_INFINITE_VERTICES =
         static_cast<int>(float(std::thread::hardware_concurrency()) *
@@ -554,10 +574,15 @@ private:
     std::cerr << "Adding " << NUM_PSEUDO_INFINITE_VERTICES << " points on a far sphere (radius = " << radius << ")...";
 #endif
 
+    auto translate = tr().geom_traits().construct_translated_point_3_object();
     for(int i = 0; i < NUM_PSEUDO_INFINITE_VERTICES; ++i, ++random_point)
-      c3t3.add_far_point(c3t3.triangulation().geom_traits().construct_point_3_object()(
-          c3t3.triangulation().geom_traits().construct_translated_point_3_object()(*random_point, center)));
+    {
+      const Point_3 random_pt = translate(*random_point, center_vec);
+      typename Tr::Point far_pt(random_pt);
+      Vertex_handle v = c3t3.triangulation().insert(far_pt);
+      c3t3.add_far_point(v);
     }
+  }
 
   bool dimension_is_modifiable(const Vertex_handle& v, const int new_dim) const
   {
