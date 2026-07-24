@@ -560,13 +560,13 @@ void tetrahedral_isotropic_remeshing(CDT_3& cdt3,
                                       typename Remesher_types::Default_Selection_functor());
 
   auto vcmap = choose_parameter(get_parameter(np, internal_np::vertex_is_constrained),
-                                typename Remesher_types::Default_VCMap{});
+                                typename Remesher_types::Default_VCMap(false));
 
   auto ecmap = choose_parameter(get_parameter(np, internal_np::edge_is_constrained),
-                                typename Remesher_types::Default_ECMap{});
+                                typename Remesher_types::Default_ECMap(false));
 
   auto fcmap = choose_parameter(get_parameter(np, internal_np::facet_is_constrained),
-                                typename Remesher_types::Default_FCMap{});
+                                typename Remesher_types::Default_FCMap(false));
 
   // Advanced and non documented parameters
   auto visitor = choose_parameter(get_parameter(np, internal_np::visitor), typename Remesher_types::Default_Visitor());

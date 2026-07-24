@@ -678,7 +678,6 @@ public:
 
   bool is_in_complex(const Cell_handle& c) const
   {
-    return !triangulation().is_infinite(c);
     for(const auto v : triangulation().vertices(c))
     {
       if(impl().vertex_type(v) == CDT_3_vertex_type::BBOX)
@@ -759,6 +758,7 @@ public:
       return 3;
     }
     CGAL_unreachable();
+    return -1;
   }
 
   void add_to_complex(const Cell_handle c, const Subdomain_index& index)
@@ -785,7 +785,7 @@ public:
   {
     v->ccdt_3_data().set_vertex_type(CDT_3_vertex_type::INPUT_VERTEX);
   }
-  void add_to_complex(const Vertex_handle, const Vertex_handle, const Curve_index&)
+  void add_to_complex(const Vertex_handle v1, const Vertex_handle v2, const Curve_index& index)
   {
 //    impl().insert_constrained_edge(v1, v2, false/*restore Delaunay*/);
   }
@@ -808,7 +808,7 @@ public:
   {
 //    remove_from_complex(e.first->vertex(e.second), e.first->vertex(e.third));
   }
-  void remove_from_complex(const Vertex_handle, const Vertex_handle)
+  void remove_from_complex(const Vertex_handle u, const Vertex_handle v)
   {
     //should not happen during tetrahedral remeshing since we keep constrained edges
     CGAL_error_msg("removing a constrained edge is not supported");
@@ -844,6 +844,7 @@ public:
   }
   auto edges_in_complex_begin() const { using std::begin; return begin(impl().edges_in_complex()); }
   auto edges_in_complex_end() const { using std::end; return end(impl().edges_in_complex()); }
+
   using Facets_in_complex_iterator = typename CDT_3_impl::Constrained_facets_iterator;
   auto facets_in_complex() const
   {
@@ -851,6 +852,7 @@ public:
   }
   auto facets_in_complex_begin() const { using std::begin; return begin(impl().constrained_facets()); }
   auto facets_in_complex_end() const { using std::end; return end(impl().constrained_facets()); }
+
   auto cells_in_complex() const
   {
     return impl().finite_cell_handles();

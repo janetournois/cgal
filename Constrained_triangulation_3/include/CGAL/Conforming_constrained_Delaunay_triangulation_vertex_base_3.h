@@ -57,7 +57,6 @@ public:
 
   ///////// for C3T3 : dummy implementation for compilation purposes
   using Index = int;
-  void set_dimension(int) {}
   ///////// end of for C3T3
 
   // model of ConformingConstrainedDelaunayTriangulationVertexBase_3
@@ -67,6 +66,9 @@ public:
   static std::string io_signature() {
     return Get_io_signature<VertexBase>()();
   }
+
+  int in_dimension() const { return ccdt_3_data().in_dimension(); }
+  void set_dimension(int dim) {}
 };
 
 } // namespace CGAL
