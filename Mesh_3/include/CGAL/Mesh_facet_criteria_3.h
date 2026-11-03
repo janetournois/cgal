@@ -253,6 +253,9 @@ private:
         break;
       }
     }
+
+    typedef Mesh_3::Facet_featuring_features_criterion<C3T3, Visitor> Features_criterion;
+    criteria_.add(new Features_criterion());
   }
 
 private:

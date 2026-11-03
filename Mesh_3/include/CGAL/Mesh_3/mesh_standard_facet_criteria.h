@@ -640,6 +640,94 @@ protected:
 
 
 
+template <typename C3T3, typename Visitor_>
+class Facet_featuring_features_criterion
+  : public Mesh_3::Abstract_criterion<C3T3, Visitor_>
+{
+private:
+  typedef typename C3T3::Triangulation Tr;
+  typedef typename Tr::Facet Facet;
+
+  typedef Mesh_3::Abstract_criterion<C3T3, Visitor_> Base;
+  typedef typename Base::Quality Quality;
+  typedef typename Base::Is_bad Is_bad;
+
+  typedef Facet_featuring_features_criterion<C3T3, Visitor_> Self;
+
+public:
+  /// Constructor
+  Facet_featuring_features_criterion() {}
+  /// Destructor
+  ~Facet_featuring_features_criterion() {}
+
+protected:
+  virtual void do_accept(Visitor_& v) const { v.visit(*this); }
+
+  virtual Self* do_clone() const {
+    // Call copy ctor on this
+    return new Self(*this);
+  }
+
+  virtual Is_bad do_is_bad(const C3T3& c3t3, const Facet& f) const
+  {
+    typedef typename Tr::Vertex_handle Vertex_handle;
+    typedef typename Tr::Cell_handle Cell_handle;
+
+    for(const Vertex_handle v : c3t3.triangulation().vertices(f))
+    {
+      const int dim = c3t3.in_dimension(v);
+      if(dim != 0 && dim != 1)
+        continue;
+
+      std::vector<typename Tr::Edge> edges;
+      c3t3.triangulation().finite_incident_edges(v, std::back_inserter(edges));
+      for(const auto& e : edges)
+      {
+        if(c3t3.is_in_complex(e))
+        {
+          bool facet_in_complex_found = false;
+
+          auto fcirc = c3t3.triangulation().incident_facets(e);
+          auto fcirc_end = fcirc;
+          do
+          {
+            if(c3t3.is_in_complex(*fcirc))
+            {
+              if(facet_in_complex_found)
+              {
+                // if another facet in complex is found,
+                // then e is a feature edge with at least 2 incident facets in complex
+                // break the loop on facets
+                break;
+              }
+              else
+                // mark that a facet is found in complex, and continue the loop on facets
+                facet_in_complex_found = true;
+            }
+          }
+          while(++fcirc != fcirc_end);
+
+          if(!facet_in_complex_found) // todo : not exactly what we want
+                                      // here, manifold and dangling surfaces
+                                      // both are valid
+          {
+            // if no other facet in complex is found,
+            // then e is a feature edge with < 1 incident facets in complex
+            // the facet is bad
+#ifdef CGAL_MESH_3_DEBUG_FACET_CRITERIA
+            std::cerr << "Bad facet (on surface criterion)" << std::endl;
+#endif
+            return Is_bad(Quality(1));
+          }
+        }
+      }
+    }
+    return Is_bad();
+  }
+}; // end class Facet_featuring_features_criterion
+
+
+
 template <typename C3T3>
 class Facet_criterion_visitor
   : public Mesh_3::Criterion_visitor<C3T3, typename C3T3::Triangulation::Facet>
